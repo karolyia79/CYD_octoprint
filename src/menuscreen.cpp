@@ -197,7 +197,7 @@ void MenuScreen::drawInfoMenu() {
     _tft->drawString(LangManager::get("info_free_ram") + " " + String(freeHeap / 1024) + " KB", 30, 50, 2);
 
     // 2. FW Verziószám
-    _tft->drawString(LangManager::get("info_fw_version") + " " + "v1.0.0", 30, 80, 2);
+    _tft->drawString(LangManager::get("info_fw_version") + " " + "v1.0.3", 30, 80, 2);
 
     // 3. OctoPrint verzió (státusz / címke)
     _tft->drawString(LangManager::get("info_octo_version") + " " + "v1.10.x", 30, 110, 2);
