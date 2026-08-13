@@ -13,12 +13,12 @@ private:
     bool _isTouched;
     PrinterConfig _config;
 
-    bool _mainMenuButtonsDrawn; // Jelzi, hogy ki vannak-e rajzolva a főmenü gombjai
+    bool _mainMenuButtonsDrawn;
     uint16_t _lastOctoColor;
     uint16_t _lastKlipperColor;
     String _lastOctoStr;
     String _lastKlipperStr;
-    uint8_t _lastSubMenuChecked; // <--- Tagváltozó bevezetése a bug javításához
+    uint8_t _lastSubMenuChecked;
 
     bool _pOctoEnabled, _pOctoConn, _pOctoPrint;
     bool _pKlipperEnabled, _pKlipperConn, _pKlipperPrint;
@@ -28,6 +28,7 @@ private:
     void drawLanguageMenu();
     void drawSkinMenu();
     void drawSystemMenu();
+    void drawInfoMenu(); // ÚJ: Rendszer infó almenü
     void drawMenuButton(int x, int y, int w, int h, const String& text, uint16_t bgColor, uint16_t textColor = TFT_WHITE);
     void drawServerStatusBars(bool octoEnabled, bool octoConn, bool octoPrint, bool klipperEnabled, bool klipperConn, bool klipperPrint, bool forceRedraw = false);
 

@@ -15,35 +15,35 @@ struct ThemeColors {
 };
 
 struct PrinterConfig {
-    bool octo_enabled;
-    String octo_ip;
-    String octo_key;
-    bool klipper_enabled;
-    String klipper_ip;
-    int klipper_port;     // Hozzáadva
-    String klipper_key;    // Hozzáadva
-    String skin;
-    String language;
+    bool octo_enabled = false;
+    String octo_ip = "";
+    String octo_key = "";
+    bool klipper_enabled = false;
+    String klipper_ip = "";
+    int klipper_port = 7125;
+    String klipper_key = "";
+    String skin = "dark";
+    String language = "hu";
     
-    // Wi-Fi és hálózati beállítások (hiányzó mezők pótolva)
-    String wifi_ssid;
-    String wifi_pass;
-    bool use_static_ip;
-    String static_ip;
-    String gateway;
-    String subnet;
-    String dns;
+    // Wi-Fi és hálózati beállítások
+    String wifi_ssid = "";
+    String wifi_pass = "";
+    bool use_static_ip = false;
+    String static_ip = "";
+    String gateway = "";
+    String subnet = "";
+    String dns = "";
 };
 
 class ConfigManager {
 public:
     static bool init();
-    static PrinterConfig loadConfig();
+    static PrinterConfig loadConfig(bool forceReload = false);
     static bool saveConfig(const PrinterConfig& config);
     static void createDefaultConfig();
 };
 
-// Globális dinamikus téma lekérdező
+// Globális dinamikus téma lekérdező (RAM-ból, azonnali válaszidővel)
 inline ThemeColors getCurrentTheme() {
     PrinterConfig config = ConfigManager::loadConfig();
     

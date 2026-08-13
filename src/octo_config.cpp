@@ -1,4 +1,5 @@
 #include "octo_config.h"
+#include "lang_manager.h"
 
 const char* OCTO_CONFIG_FILE = "/octoconfig.json";
 
@@ -56,5 +57,5 @@ void OctoConfigManager::saveConfig(const OctoConfigData& config) {
 void OctoConfigManager::createDefaultConfig() {
     OctoConfigData defaultConfig;
     saveConfig(defaultConfig);
-    Serial.println("[OctoConfig] Alapertelmezett octoconfig.json letrehozva.");
+    Serial.println(LangManager::get("sys_octoconfig_created"));
 }

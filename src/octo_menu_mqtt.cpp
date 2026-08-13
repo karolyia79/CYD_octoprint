@@ -1,15 +1,15 @@
-#include "octo_menu.h"
+#include "octo_menu_mqtt.h"
 #include "lang_manager.h"
 #include "ui_utils.h"
 #include "config_manager.h"
 #include <math.h>
 
-OctoMenu::OctoMenu(TFT_eSPI* tft) : _tft(tft), _bedLevelMenu(tft), _otherCalibMenu(tft) {
+OctoMenuMqtt::OctoMenuMqtt(TFT_eSPI* tft) : _tft(tft), _bedLevelMenu(tft), _otherCalibMenu(tft) {
     _bedLevelMenu.init();
     _otherCalibMenu.init();
 }
 
-void OctoMenu::draw(OctoClient* client) {
+void OctoMenuMqtt::draw(OctoClientMqtt* client) {
     bool meshSavedActive = client ? client->shouldShowMeshSavedPopup() : false;
     bool noMeshActive = client ? client->shouldShowNoMeshPopup() : false;
 
@@ -58,10 +58,10 @@ void OctoMenu::draw(OctoClient* client) {
                 bool homing = client ? client->isHoming() : false;
 
                 if (subStateChanged || (prevHoming && !homing)) {
-                    drawPrepareMenu();
-                }
-
-                if (homing) {
+                    Serial.printf("[%lu ms] [UI PREPARE DRAW] Képernyő újrarajzolása! subStateChanged=%d, prevHoming=%d, homing=%d\n",
+                                  millis(), subStateChanged, prevHoming, homing);
+                    drawPrepareMenu(client);
+                } else if (homing) {
                     updatePrepareMenu(client); 
                 }
                 prevHoming = homing;
@@ -140,7 +140,7 @@ void OctoMenu::draw(OctoClient* client) {
     _forceRedraw = false;
 }
 
-void OctoMenu::drawMeshLoadingScreen() {
+void OctoMenuMqtt::drawMeshLoadingScreen() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -154,7 +154,7 @@ void OctoMenu::drawMeshLoadingScreen() {
     UIUtils::drawButton(_tft, 20, 204, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::updateMeshButtons(OctoClient* client) {
+void OctoMenuMqtt::updateMeshButtons(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     bool building = client ? client->isMeshBuilding() : false;
     uint16_t btnColor = building ? getPulsingColor() : theme.cardBg;
@@ -163,7 +163,7 @@ void OctoMenu::updateMeshButtons(OctoClient* client) {
     UIUtils::drawButton(_tft, 170, 75, 135, 40, building ? LangManager::get("octo_btn_measuring") : LangManager::get("octo_btn_build_5x5"), btnColor, theme.text, false, 2, 5);
 }
 
-void OctoMenu::updatePrepareMenu(OctoClient* client) {
+void OctoMenuMqtt::updatePrepareMenu(OctoClientMqtt* client, bool force) {
     ThemeColors theme = getCurrentTheme();
     static unsigned long lastPulseUpdate = 0;
     static uint16_t lastBtnColor = 0;
@@ -172,15 +172,20 @@ void OctoMenu::updatePrepareMenu(OctoClient* client) {
     uint16_t btnColor = homing ? getPulsingColor() : theme.cardBg;
 
     unsigned long now = millis();
-    if (now - lastPulseUpdate > 80 || btnColor != lastBtnColor) {
+    if (force || now - lastPulseUpdate > 80 || btnColor != lastBtnColor) {
         lastPulseUpdate = now;
         lastBtnColor = btnColor;
 
-        UIUtils::drawButton(_tft, 20, 75, 280, 35, homing ? LangManager::get("octo_btn_homing") : LangManager::get("octo_btn_autohome"), btnColor, theme.text, false, 2, 5);
+        String homeTxt = homing ? LangManager::get("octo_btn_homing") : LangManager::get("octo_btn_autohome");
+
+        Serial.printf("[%lu ms] [UI GOMB RAJZOLÁS] Text: '%s' | Color: 0x%04X | isHoming: %s | Force: %d\n",
+                      millis(), homeTxt.c_str(), btnColor, homing ? "TRUE" : "FALSE", force);
+
+        UIUtils::drawButton(_tft, 20, 75, 280, 40, homeTxt, btnColor, theme.text, false, 2, 5);
     }
 }
 
-void OctoMenu::drawUnsupportedPopup() {
+void OctoMenuMqtt::drawUnsupportedPopup() {
     _tft->fillRoundRect(25, 75, 270, 105, 8, _tft->color565(40, 10, 10));
     _tft->drawRoundRect(25, 75, 270, 105, 8, TFT_ORANGE);
     _tft->drawRoundRect(26, 76, 268, 103, 7, TFT_ORANGE);
@@ -194,7 +199,7 @@ void OctoMenu::drawUnsupportedPopup() {
     _tft->drawString(LangManager::get("popup_unsupported_line2"), 160, 150, 2);
 }
 
-void OctoMenu::drawNoMeshPopup() {
+void OctoMenuMqtt::drawNoMeshPopup() {
     _tft->fillRoundRect(25, 75, 270, 105, 8, _tft->color565(40, 10, 10));
     _tft->drawRoundRect(25, 75, 270, 105, 8, TFT_RED);
     _tft->drawRoundRect(26, 76, 268, 103, 7, TFT_RED);
@@ -208,14 +213,14 @@ void OctoMenu::drawNoMeshPopup() {
     _tft->drawString(LangManager::get("popup_nomesh_line2"), 160, 150, 1);
 }
 
-uint16_t OctoMenu::getPulsingColor() {
+uint16_t OctoMenuMqtt::getPulsingColor() {
     float factor = (sin(millis() / 180.0) + 1.0) / 2.0;
     uint8_t r = 100 + (uint8_t)(155 * factor);
     uint8_t g = 30 + (uint8_t)(110 * factor);
     return _tft->color565(r, g, 0);
 }
 
-void OctoMenu::drawMeshSavedPopup() {
+void OctoMenuMqtt::drawMeshSavedPopup() {
     _tft->fillRoundRect(35, 75, 250, 105, 8, _tft->color565(15, 35, 15));
     _tft->drawRoundRect(35, 75, 250, 105, 8, TFT_GREEN);
     _tft->drawRoundRect(36, 76, 248, 103, 7, TFT_GREEN);
@@ -228,12 +233,12 @@ void OctoMenu::drawMeshSavedPopup() {
     _tft->drawString(LangManager::get("popup_meshsaved_line1"), 160, 148, 2);
 }
 
-void OctoMenu::drawMainMenu() {
+void OctoMenuMqtt::drawMainMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
-    _tft->drawString(LangManager::get("octo_menu_title"), 160, 48, 2);
+    _tft->drawString(LangManager::get("octo_menu_mqtt_title"), 160, 48, 2);
 
     UIUtils::drawButton(_tft, 20, 75, 130, 55, LangManager::get("octo_btn_prepare"), theme.cardBg, theme.text, false, 2, 5);
     UIUtils::drawButton(_tft, 170, 75, 130, 55, LangManager::get("octo_btn_control"), theme.cardBg, theme.text, false, 2, 5);
@@ -243,21 +248,22 @@ void OctoMenu::drawMainMenu() {
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::drawPrepareMenu() {
+void OctoMenuMqtt::drawPrepareMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
     _tft->drawString(LangManager::get("octo_menu_prepare_title"), 160, 48, 2);
 
-    UIUtils::drawButton(_tft, 20, 75, 280, 35, LangManager::get("octo_btn_autohome"), theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 20, 118, 280, 35, LangManager::get("octo_btn_steppers_off"), theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 20, 161, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, false, 2, 5);
+    updatePrepareMenu(client, true);
+    UIUtils::drawButton(_tft, 20, 120, 280, 35, LangManager::get("octo_btn_steppers_off"), theme.cardBg, theme.text, false, 2, 5);
+    
+    UIUtils::drawButton(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, false, 2, 5);
 
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::drawCalibrationMenu() {
+void OctoMenuMqtt::drawCalibrationMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -272,7 +278,7 @@ void OctoMenu::drawCalibrationMenu() {
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::drawControlMenu() {
+void OctoMenuMqtt::drawControlMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -286,7 +292,7 @@ void OctoMenu::drawControlMenu() {
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::drawFilamentMenu() {
+void OctoMenuMqtt::drawFilamentMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -300,7 +306,7 @@ void OctoMenu::drawFilamentMenu() {
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::drawTuneRow(int y, const String& label, const String& valueStr) {
+void OctoMenuMqtt::drawTuneRow(int y, const String& label, const String& valueStr) {
     ThemeColors theme = getCurrentTheme();
     UIUtils::drawButton(_tft, 15, y, 45, 30, "-", theme.cardBg, theme.text, false, 4, 4);
 
@@ -312,20 +318,20 @@ void OctoMenu::drawTuneRow(int y, const String& label, const String& valueStr) {
     UIUtils::drawButton(_tft, 260, y, 45, 30, "+", theme.cardBg, theme.text, false, 4, 4);
 }
 
-void OctoMenu::drawTuneMenu(OctoClient* client) {
+void OctoMenuMqtt::drawTuneMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
-    _tft->drawString(LangManager::get("octo_menu_tune_title_http"), 160, 48, 2);
+    _tft->drawString(LangManager::get("octo_menu_tune_title"), 160, 48, 2);
 
     int spd = client ? client->getData().speed : 100;
     int nzl = client ? (int)client->getData().nozzleTarget : 0;
     int bed = client ? (int)client->getData().bedTarget : 0;
 
-    drawTuneRow(72,  LangManager::get("octo_label_speed"),   String(spd) + "%");
-    drawTuneRow(106, LangManager::get("main_screen_nozzle"), String(nzl) + "C");
-    drawTuneRow(140, LangManager::get("main_screen_bed"),    String(bed) + "C");
+    drawTuneRow(72,  LangManager::get("octo_label_speed"),     String(spd) + "%");
+    drawTuneRow(106, LangManager::get("main_screen_nozzle"),   String(nzl) + "C");
+    drawTuneRow(140, LangManager::get("main_screen_bed"),      String(bed) + "C");
 
     UIUtils::drawButton(_tft, 15, 174, 45, 30, "-0.01", theme.cardBg, theme.text, false, 1, 4);
 
@@ -339,7 +345,7 @@ void OctoMenu::drawTuneMenu(OctoClient* client) {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenu::drawZOffsetMenu() {
+void OctoMenuMqtt::drawZOffsetMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -362,7 +368,7 @@ void OctoMenu::drawZOffsetMenu() {
     UIUtils::drawButton(_tft, 20, 200, 280, 28, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 5);
 }
 
-void OctoMenu::drawMeshMenu(OctoClient* client) {
+void OctoMenuMqtt::drawMeshMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -376,7 +382,7 @@ void OctoMenu::drawMeshMenu(OctoClient* client) {
     UIUtils::drawButton(_tft, 20, 190, 280, 32, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 5);
 }
 
-uint16_t OctoMenu::getMeshColor(float val) {
+uint16_t OctoMenuMqtt::getMeshColor(float val) {
     if (abs(val) < 0.015f) return _tft->color565(40, 40, 40);
 
     if (val > 0) {
@@ -388,7 +394,7 @@ uint16_t OctoMenu::getMeshColor(float val) {
     }
 }
 
-void OctoMenu::drawShowMeshMenu(OctoClient* client) {
+void OctoMenuMqtt::drawShowMeshMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -446,7 +452,7 @@ void OctoMenu::drawShowMeshMenu(OctoClient* client) {
     UIUtils::drawButton(_tft, 20, 204, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-int OctoMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* client) {
+int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
 
     if (_showUnsupportedPopup) {
@@ -477,7 +483,7 @@ int OctoMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* client) {
             if (x >= 20 && x <= 150) {
                 UIUtils::pressFeedback(_tft, 20, 75, 130, 55, LangManager::get("octo_btn_prepare"), theme.cardBg, theme.text, 2, 5);
                 _subState = SUB_PREPARE;
-                drawPrepareMenu();
+                drawPrepareMenu(client);
                 return 1;
             } else if (x >= 170 && x <= 300) {
                 UIUtils::pressFeedback(_tft, 170, 75, 130, 55, LangManager::get("octo_btn_control"), theme.cardBg, theme.text, 2, 5);
@@ -509,30 +515,33 @@ int OctoMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* client) {
             return 1; 
         }
         
-        if (y >= 75 && y <= 110) {
+        if (y >= 75 && y <= 115) {
             if (client && client->isHoming()) {
+                Serial.printf("[%lu ms] [UI TOUCH REJECTED] G28 érintés elutasítva! isHoming = TRUE\n", millis());
                 return 1; 
             }
             
             if (client) {
-                UIUtils::pressFeedback(_tft, 20, 75, 280, 35, LangManager::get("octo_btn_autohome"), theme.cardBg, theme.text, 2, 5);
+                Serial.printf("[%lu ms] [UI TOUCH ACCEPTED] G28 Gomb megnyomva! autoHome() indítása...\n", millis());
+                UIUtils::pressFeedback(_tft, 20, 75, 280, 40, LangManager::get("octo_btn_autohome"), theme.cardBg, theme.text, 2, 5);
                 client->autoHome(); 
-                updatePrepareMenu(client);
+                updatePrepareMenu(client, true);
             }
             return 1;
         }
 
-        if (y >= 118 && y <= 153) {
+        if (y >= 120 && y <= 155) {
             if (client) {
-                UIUtils::pressFeedback(_tft, 20, 118, 280, 35, LangManager::get("octo_btn_steppers_off"), theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 20, 120, 280, 35, LangManager::get("octo_btn_steppers_off"), theme.cardBg, theme.text, 2, 5);
                 client->disableSteppers();
             }
             return 1;
         }
 
-        if (y >= 161 && y <= 196) {
+        // ÚJ Cooldown gomb érintéskezelése (Nozzle és Bed célhőmérséklet -> 0)
+        if (y >= 160 && y <= 195) {
             if (client) {
-                UIUtils::pressFeedback(_tft, 20, 161, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, false, 2, 5);
+                UIUtils::pressFeedback(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, 2, 5);
                 client->setNozzleTarget(0);
                 client->setBedTarget(0);
             }

@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <FS.h>   // SD fájlrendszer támogatáshoz
 
-// Hogy a WebServer lássa a globális FS típust:
 using fs::FS;
 
 #include <WebServer.h>

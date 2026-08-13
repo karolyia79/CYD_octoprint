@@ -1,28 +1,46 @@
 #include "ap.h"
 #include "lang_manager.h"
+#include <SPI.h>
 
 APManager::APManager(SplashScreen* splash) : _splash(splash), _server(80) {}
 
 void APManager::begin() {
     PrinterConfig cfg = ConfigManager::loadConfig();
+    
+    digitalWrite(15, HIGH);
+    digitalWrite(5, LOW);
+    SPI.setFrequency(4000000);
+    LangManager::loadLanguage(cfg.language);
+    digitalWrite(5, HIGH);
 
-    Serial.println("\n--- CONFIG BETOLTVE ---");
+    Serial.println("\n--- AP MANAGER INDITASA ---");
     Serial.println("SSID: [" + cfg.wifi_ssid + "]");
-    Serial.println("Jelszo hossza: " + String(cfg.wifi_pass.length()));
-    Serial.println("OctoPrint engedelyezve: " + String(cfg.octo_enabled ? "IGEN" : "NEM"));
-    Serial.println("Klipper engedelyezve: " + String(cfg.klipper_enabled ? "IGEN" : "NEM"));
-    Serial.println("------------------------\n");
+    Serial.println("----------------------------\n");
 
-    if (cfg.wifi_ssid != "") {
-        connectWiFi(cfg);
-    } else {
-        Serial.println("Nincs megadva SSID a configban -> AP mod inditasa.");
-        startAPMode();
-    }
-
+    startAPMode();
     setupRoutes();
     _server.begin();
-    Logger::logSystem("Webszerver elinditva.");
+    Logger::logSystem("AP Webszerver elinditva.");
+
+    Serial.println("[AP MODE] Varakozas a WebUI beallitasokra vagy kijelzo erintesre...");
+    
+    uint16_t touchX, touchY;
+    while (true) {
+        _server.handleClient();
+        
+        if (_splash->getTouch(&touchX, &touchY)) {
+            Serial.println("[AP MODE] Kijelzo megerintve! Tovabblepes...");
+            delay(200);
+            break;
+        }
+        delay(10);
+    }
+}
+
+void APManager::startServer() {
+    setupRoutes();
+    _server.begin();
+    Logger::logSystem("Webszerver elinditva a helyi IP-n: " + WiFi.localIP().toString());
 }
 
 void APManager::connectWiFi(const PrinterConfig& cfg) {
@@ -70,11 +88,11 @@ void APManager::connectWiFi(const PrinterConfig& cfg) {
 
         Logger::logSystem("Csatlakozva a Wi-Fi-hez. IP: " + WiFi.localIP().toString());
         _splash->showMessage(LangManager::get("wifi_connected"), TFT_GREEN);
-        delay(500);
+        delay(200);
         _splash->showConnectedInfo(WiFi.localIP().toString(), cfg.octo_enabled, cfg.klipper_enabled);
     } else {
-        Serial.println("HIBA: Nem sikerult csatlakozni a Wi-Fi-hez! WiFi.status() kod: " + String(WiFi.status()));
-        Logger::logError("Nem sikerult csatlakozni a Wi-Fi-hez, hiba kiirasa es AP modra valtas...");
+        Serial.println("HIBA: Nem sikerult csatlakozni a Wi-Fi-hez!");
+        Logger::logError("Nem sikerult csatlakozni a Wi-Fi-hez, AP modra valtas...");
 
         String errorReason = "";
         switch(WiFi.status()) {
@@ -91,7 +109,7 @@ void APManager::connectWiFi(const PrinterConfig& cfg) {
         uint16_t touchX, touchY;
         while (millis() - errorStartTime < 10000) {
             if (_splash->getTouch(&touchX, &touchY)) {
-                delay(300);
+                delay(200);
                 break;
             }
             delay(50);
@@ -105,20 +123,26 @@ void APManager::startAPMode() {
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP("OctoScreen_Setup", "12345678");
 
-    delay(200);
+    delay(100);
 
     IPAddress IP = WiFi.softAPIP();
     
-    Serial.print("AP Mod elinditva. Hozzalehet csatlakozni. IP: ");
+    Serial.print("AP Mod elinditva. IP: ");
     Serial.println(IP);
 
-    Logger::logSystem("AP Mod (Scan kepes) inditva. IP: " + IP.toString());
+    Logger::logSystem("AP Mod inditva. IP: " + IP.toString());
     _splash->showAPInfo("OctoScreen_Setup", "12345678", IP.toString(), false, _lastWifiError);
 }
 
 void APManager::setupRoutes() {
     _server.on("/", HTTP_GET, [this]() {
         PrinterConfig cfg = ConfigManager::loadConfig();
+        
+        digitalWrite(15, HIGH);
+        digitalWrite(5, LOW);
+        SPI.setFrequency(4000000);
+        LangManager::loadLanguage(cfg.language);
+        digitalWrite(5, HIGH);
 
         String html = "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>";
         html += "<style>";
@@ -140,9 +164,16 @@ void APManager::setupRoutes() {
         html += ".btn-warning:hover { background: #b45309; }";
         html += "</style>";
         html += "<script>";
+        // Azonnali nyelvváltás szkript (AJAX hívás az onchange eseményre)
+        html += "function changeLanguage(sel) {";
+        html += "  let lang = sel.value;";
+        html += "  fetch('/savelang?lang=' + lang, { method: 'POST' }).then(res => {";
+        html += "    location.reload();";
+        html += "  }).catch(err => { alert('Hiba a nyelvváltáskor!'); });";
+        html += "}";
         html += "function scanNetworks() {";
         html += "  let btn = document.getElementById('scan_btn');";
-        html += "  btn.innerHTML = 'Keresés folyamatban...';";
+        html += "  btn.innerHTML = 'Kereses folyamatban...';";
         html += "  fetch('/scan').then(res => res.json()).then(data => {";
         html += "    let select = document.getElementById('ssid_select');";
         html += "    select.innerHTML = '';";
@@ -151,8 +182,8 @@ void APManager::setupRoutes() {
         html += "      opt.value = net.ssid; opt.innerHTML = net.ssid + ' (' + net.rssi + ' dBm)';";
         html += "      select.appendChild(opt);";
         html += "    });";
-        html += "    btn.innerHTML = 'Hálózatok Keresése';";
-        html += "  }).catch(err => { btn.innerHTML = 'Hiba a keresésben!'; });";
+        html += "    btn.innerHTML = 'Halozatok Keresese';";
+        html += "  }).catch(err => { btn.innerHTML = 'Hiba a keresesben!'; });";
         html += "}";
         html += "function togglePassword() {";
         html += "  let pw = document.getElementById('wifi_pass_input');";
@@ -163,94 +194,134 @@ void APManager::setupRoutes() {
         html += "  x.style.display = document.getElementById('use_static_ip').checked ? 'block' : 'none';";
         html += "}";
         html += "function restartDevice() {";
-        html += "  if(confirm('Biztosan újra szeretnéd indítani az eszközt?')) {";
+        html += "  if(confirm('Biztosan ujra szeretned inditani az eszkozt?')) {";
         html += "    fetch('/restart', { method: 'POST' }).then(res => {";
         html += "      document.open();";
-        html += "      document.write('<html><body style=\"background:#0f172a;color:#fff;text-align:center;padding-top:50px;font-family:sans-serif;\"><h2>Eszköz újraindul... Kérlek várj.</h2></body></html>');";
+        html += "      document.write('<html><body style=\"background:#0f172a;color:#fff;text-align:center;padding-top:50px;font-family:sans-serif;\"><h2>Eszkoz ujraindul... Kerlek varj.</h2></body></html>');";
         html += "      document.close();";
         html += "      setTimeout(() => { location.reload(); }, 4000);";
-        html += "    }).catch(err => { alert('Hiba történt a művelet közben!'); });";
+        html += "    }).catch(err => { alert('Hiba tortent a muvelet kozben!'); });";
         html += "  }";
         html += "}";
         html += "function formatSD() {";
-        html += "  if(confirm('Biztosan törölni szeretnéd az SD kártya tartalmát? Minden beállítás és log fájl elveszik!')) {";
+        html += "  if(confirm('Biztosan torolni szeretned az SD kartya tartalmat? Minden beallitas es log fajl elveszik!')) {";
         html += "    fetch('/format', { method: 'POST' }).then(res => {";
         html += "      document.open();";
-        html += "      document.write('<html><body style=\"background:#0f172a;color:#fff;text-align:center;padding-top:50px;font-family:sans-serif;\"><h2>SD kártya törölve. Újraindítás...</h2></body></html>');";
+        html += "      document.write('<html><body style=\"background:#0f172a;color:#fff;text-align:center;padding-top:50px;font-family:sans-serif;\"><h2>SD kartya torolve. Ujrainditas...</h2></body></html>');";
         html += "      document.close();";
         html += "      setTimeout(() => { location.reload(); }, 3000);";
-        html += "    }).catch(err => { alert('Hiba történt a művelet közben!'); });";
+        html += "    }).catch(err => { alert('Hiba tortent a muvelet kozben!'); });";
         html += "  }";
         html += "}";
         html += "</script></head><body>";
         
         html += "<div class='container'>";
-        html += "<h2>OctoScreen Konfiguráció</h2>";
+        html += "<h2>" + LangManager::get("ap_title") + "</h2>";
         html += "<form action='/save' method='POST'>";
 
         html += "<div class='card'>";
-        html += "<h3>Wi-Fi Beállítások</h3>";
-        html += "<button type='button' id='scan_btn' class='btn-scan' onclick='scanNetworks()'>Hálózatok Keresése</button>";
-        html += "<label>Kiválasztott SSID:</label>";
-        html += "<select name='wifi_ssid' id='ssid_select'><option value='" + cfg.wifi_ssid + "'>" + (cfg.wifi_ssid == "" ? "-- Válassz vagy keresgélj --" : cfg.wifi_ssid) + "</option></select>";
-        html += "<label>Vagy SSID kézzel:</label>";
-        html += "<input type='text' name='wifi_ssid_manual' value='" + cfg.wifi_ssid + "'>";
+        html += "<h3 style='color: #38bdf8; margin-top: 0;'>" + LangManager::get("ap_lang_title") + "</h3>";
+        // Itt adjuk hozzá az onchange eseményt az azonnali váltáshoz
+        html += "<select name='language' onchange='changeLanguage(this)'>";
+        html += "<option value='hu' " + String(cfg.language == "hu" ? "selected" : "") + ">Magyar</option>";
+        html += "<option value='en' " + String(cfg.language == "en" ? "selected" : "") + ">English</option>";
+        html += "<option value='de' " + String(cfg.language == "de" ? "selected" : "") + ">Deutsch</option>";
+        html += "<option value='pl' " + String(cfg.language == "pl" ? "selected" : "") + ">Polski</option>";
+        html += "</select>";
+        html += "</div>";
+
+        html += "<div class='card'>";
+        html += "<h3>" + LangManager::get("ap_wifi_settings") + "</h3>";
+        html += "<button type='button' id='scan_btn' class='btn-scan' onclick='scanNetworks()'>" + LangManager::get("ap_scan_networks") + "</button>";
+        html += "<label>" + LangManager::get("ap_selected_ssid") + "</label>";
+        html += "<select name='wifi_ssid' id='ssid_select'><option value='" + cfg.wifi_ssid + "'>" + (cfg.wifi_ssid == "" ? "-- Valassz vagy keresgelj --" : cfg.wifi_ssid) + "</option></select>";
+        html += "<label>" + LangManager::get("ap_manual_ssid") + "</label>";
+        html += "<input type='text' name='wifi_ssid_manual' value='' placeholder='" + (cfg.wifi_ssid != "" ? cfg.wifi_ssid : "Kezi SSID megadasa") + "'>";
         
-        html += "<label>Wi-Fi Jelszó:</label>";
+        html += "<label>" + LangManager::get("ap_wifi_pass") + "</label>";
         html += "<input type='password' id='wifi_pass_input' name='wifi_pass' value='" + cfg.wifi_pass + "'>";
         html += "<div class='checkbox-group'>";
         html += "<input type='checkbox' id='show_pass_chk' onclick='togglePassword()'>";
-        html += "<label for='show_pass_chk' style='margin-bottom:0;'>Jelszó mutatása</label>";
+        html += "<label for='show_pass_chk' style='margin-bottom:0;'>" + LangManager::get("ap_show_pass") + "</label>";
         html += "</div>";
         
         html += "<div class='checkbox-group'>";
         html += "<input type='checkbox' id='use_static_ip' name='use_static_ip' value='true' " + String(cfg.use_static_ip ? "checked" : "") + " onclick='toggleStatic()'>";
-        html += "<label for='use_static_ip' style='margin-bottom:0;'>Statikus IP használata</label>";
+        html += "<label for='use_static_ip' style='margin-bottom:0;'>" + LangManager::get("ap_use_static") + "</label>";
         html += "</div>";
 
         html += "<div id='static_div' style='display:" + String(cfg.use_static_ip ? "block" : "none") + ";'>";
-        html += "<label>IP Cím:</label><input type='text' name='static_ip' value='" + cfg.static_ip + "'>";
-        html += "<label>Átjáró (Gateway):</label><input type='text' name='gateway' value='" + cfg.gateway + "'>";
-        html += "<label>Alhálózati Maszk:</label><input type='text' name='subnet' value='" + cfg.subnet + "'>";
-        html += "<label>DNS Szerver:</label><input type='text' name='dns' value='" + cfg.dns + "'>";
+        html += "<label>" + LangManager::get("ap_ip_address") + "</label><input type='text' name='static_ip' value='" + cfg.static_ip + "'>";
+        html += "<label>" + LangManager::get("ap_gateway") + "</label><input type='text' name='gateway' value='" + cfg.gateway + "'>";
+        html += "<label>" + LangManager::get("ap_subnet") + "</label><input type='text' name='subnet' value='" + cfg.subnet + "'>";
+        html += "<label>" + LangManager::get("ap_dns") + "</label><input type='text' name='dns' value='" + cfg.dns + "'>";
         html += "</div>";
         html += "</div>";
 
         html += "<div class='card'>";
         html += "<div class='checkbox-group'>";
         html += "<input type='checkbox' id='octo_enabled' name='octo_enabled' value='true' " + String(cfg.octo_enabled ? "checked" : "") + ">";
-        html += "<label for='octo_enabled' style='margin-bottom:0; color:#38bdf8;'>OctoPrint Kapcsolat Engedélyezése</label>";
+        html += "<label for='octo_enabled' style='margin-bottom:0; color:#38bdf8;'>" + LangManager::get("ap_octo_enabled") + "</label>";
         html += "</div>";
-        html += "<label>OctoPrint IP / Host:</label><input type='text' name='octo_ip' value='" + cfg.octo_ip + "'>";
-        html += "<label>API Kulcs:</label><input type='text' name='octo_key' value='" + cfg.octo_key + "'>";
+        html += "<label>" + LangManager::get("ap_octo_ip") + "</label><input type='text' name='octo_ip' value='" + cfg.octo_ip + "'>";
+        html += "<label>" + LangManager::get("ap_octo_key") + "</label><input type='text' name='octo_key' value='" + cfg.octo_key + "'>";
         html += "</div>";
 
         html += "<div class='card'>";
         html += "<div class='checkbox-group'>";
         html += "<input type='checkbox' id='klipper_enabled' name='klipper_enabled' value='true' " + String(cfg.klipper_enabled ? "checked" : "") + ">";
-        html += "<label for='klipper_enabled' style='margin-bottom:0; color:#38bdf8;'>Klipper (Moonraker) Engedélyezése</label>";
+        html += "<label for='klipper_enabled' style='margin-bottom:0; color:#38bdf8;'>" + LangManager::get("ap_klipper_enabled") + "</label>";
         html += "</div>";
-        html += "<label>Klipper IP / Host:</label><input type='text' name='klipper_ip' value='" + cfg.klipper_ip + "'>";
-        html += "<label>Port (Moonraker):</label><input type='number' name='klipper_port' value='" + String(cfg.klipper_port) + "'>";
-        html += "<label>API Kulcs (Opcionális):</label><input type='text' name='klipper_key' value='" + cfg.klipper_key + "'>";
+        html += "<label>" + LangManager::get("ap_klipper_ip") + "</label><input type='text' name='klipper_ip' value='" + cfg.klipper_ip + "'>";
+        html += "<label>" + LangManager::get("ap_klipper_port") + "</label><input type='number' name='klipper_port' value='" + String(cfg.klipper_port) + "'>";
+        html += "<label>" + LangManager::get("ap_klipper_key") + "</label><input type='text' name='klipper_key' value='" + cfg.klipper_key + "'>";
         html += "</div>";
 
-        html += "<input type='submit' value='Mentés és Újraindítás'>";
+        html += "<input type='submit' value='" + LangManager::get("ap_save_btn") + "'>";
         html += "</form>";
 
         html += "<div class='card' style='margin-top: 20px; border: 1px solid #475569;'>";
-        html += "<h3 style='color: #38bdf8; margin-top: 0;'>Karbantartás és Rendszer</h3>";
+        html += "<h3 style='color: #38bdf8; margin-top: 0;'>" + LangManager::get("ap_maintenance") + "</h3>";
         
-        html += "<p style='font-size: 13px; color: #94a3b8; margin-bottom: 10px;'>Az eszköz azonnali újraindítása.</p>";
-        html += "<button type='button' class='btn-warning' onclick='restartDevice()'>Eszköz Újraindítása</button>";
+        html += "<p style='font-size: 13px; color: #94a3b8; margin-bottom: 10px;'>" + LangManager::get("ap_restart_desc") + "</p>";
+        html += "<button type='button' class='btn-warning' onclick='restartDevice()'>" + LangManager::get("ap_restart_btn") + "</button>";
 
-        html += "<p style='font-size: 13px; color: #94a3b8; margin-top: 15px; margin-bottom: 10px;'>Az SD kártya teljes tartalmának törlése és alaphelyzetbe állítása.</p>";
-        html += "<button type='button' class='btn-danger' onclick='formatSD()'>SD Kártya Törlése / Formázása</button>";
+        html += "<p style='font-size: 13px; color: #94a3b8; margin-top: 15px; margin-bottom: 10px;'>" + LangManager::get("ap_format_desc") + "</p>";
+        html += "<button type='button' class='btn-danger' onclick='formatSD()'>" + LangManager::get("ap_format_btn") + "</button>";
         html += "</div>";
 
         html += "</div></body></html>";
 
         _server.send(200, "text/html; charset=utf-8", html);
+    });
+
+    // Új endpoint az azonnali háttér-nyelvváltáshoz
+    _server.on("/savelang", HTTP_POST, [this]() {
+        String newLang = _server.arg("lang");
+        newLang.trim();
+        if (newLang.length() > 0) {
+            PrinterConfig cfg = ConfigManager::loadConfig();
+            cfg.language = newLang;
+            ConfigManager::saveConfig(cfg);
+
+            // Azonnali érvényesítés a memóriában
+            digitalWrite(15, HIGH);
+            digitalWrite(5, LOW);
+            SPI.setFrequency(4000000);
+            LangManager::loadLanguage(cfg.language);
+            digitalWrite(5, HIGH);
+
+            // Ha AP módban vagyunk, a fizikai kijelzőt is azonnal frissítjük az új nyelven!
+            if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+                IPAddress IP = WiFi.softAPIP();
+                int currentStations = WiFi.softAPgetStationNum();
+                _splash->showAPInfo("OctoScreen_Setup", "12345678", IP.toString(), currentStations > 0, _lastWifiError);
+            }
+
+            _server.send(200, "application/json", "{\"status\":\"ok\"}");
+        } else {
+            _server.send(400, "application/json", "{\"status\":\"error\"}");
+        }
     });
 
     _server.on("/scan", HTTP_GET, [this]() {
@@ -271,9 +342,25 @@ void APManager::setupRoutes() {
 
     _server.on("/save", HTTP_POST, [this]() {
         Serial.println("\n--- MENTESI KERELES ERKEZETT ---");
-        PrinterConfig cfg;
+        PrinterConfig cfg = ConfigManager::loadConfig(); 
+
+        String selectedLang = _server.arg("language");
+        selectedLang.trim();
+        if (selectedLang.length() > 0) {
+            cfg.language = selectedLang;
+        }
+        
         String manualSsid = _server.arg("wifi_ssid_manual");
-        cfg.wifi_ssid = (manualSsid != "") ? manualSsid : _server.arg("wifi_ssid");
+        manualSsid.trim();
+        String selSsid = _server.arg("wifi_ssid");
+        selSsid.trim();
+        
+        if (manualSsid.length() > 0) {
+            cfg.wifi_ssid = manualSsid;
+        } else if (selSsid.length() > 0) {
+            cfg.wifi_ssid = selSsid;
+        }
+
         cfg.wifi_pass = _server.arg("wifi_pass");
 
         cfg.use_static_ip = (_server.arg("use_static_ip") == "true");
@@ -288,37 +375,51 @@ void APManager::setupRoutes() {
 
         cfg.klipper_enabled = (_server.arg("klipper_enabled") == "true");
         cfg.klipper_ip = _server.arg("klipper_ip");
-        cfg.klipper_port = _server.arg("klipper_port").toInt();
+        int port = _server.arg("klipper_port").toInt();
+        cfg.klipper_port = (port > 0) ? port : 7125;
         cfg.klipper_key = _server.arg("klipper_key");
 
         bool saved = ConfigManager::saveConfig(cfg);
         Serial.println("Mentes eredmenye az SD-re: " + String(saved ? "SIKER" : "HIBA"));
 
+        // Azonnali érvényesítés újraindítás nélkül
+        digitalWrite(15, HIGH);
+        digitalWrite(5, LOW);
+        SPI.setFrequency(4000000);
+        LangManager::loadLanguage(cfg.language);
+        digitalWrite(5, HIGH);
+
+        if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+            IPAddress IP = WiFi.softAPIP();
+            int currentStations = WiFi.softAPgetStationNum();
+            _splash->showAPInfo("OctoScreen_Setup", "12345678", IP.toString(), currentStations > 0, _lastWifiError);
+        }
+
         _server.send(200, "text/html; charset=utf-8", 
             "<html><body style='font-family:sans-serif; background:#0f172a; color:#fff; text-align:center; padding-top:50px;'>"
-            "<h2>Sikeres mentés! Az eszköz újraindul...</h2>"
-            "<p style='color: #94a3b8; font-size: 14px;'>Kérlek várj, a főoldal hamarosan automatikusan betöltődik.</p>"
+            "<h2>Sikeres mentés! A beállítások azonnal érvénybe léptek.</h2>"
+            "<p style='color: #94a3b8; font-size: 14px;'>A főoldal hamarosan automatikusan betöltődik.</p>"
             "<script>"
             "  setTimeout(() => {"
             "    window.location.href = '/';"
-            "  }, 5000);"
+            "  }, 2000);"
             "</script>"
             "</body></html>"
         );
-        
-        delay(1500);
-        ESP.restart();
     });
 
     _server.on("/restart", HTTP_POST, [this]() {
         Serial.println("\n--- TAVOLI UJRAINDITASI KERELES ---");
         _server.send(200, "text/html; charset=utf-8", "<html><body style='font-family:sans-serif; background:#0f172a; color:#fff; text-align:center; padding-top:50px;'><h2>Az eszköz újraindul...</h2></body></html>");
-        delay(1500);
+        delay(1000);
         ESP.restart();
     });
 
     _server.on("/format", HTTP_POST, [this]() {
         Serial.println("\n--- SD KARTYA TORLESI KERELES ---");
+        digitalWrite(15, HIGH);
+        digitalWrite(5, LOW);
+        SPI.setFrequency(4000000);
         File root = SD.open("/");
         if (root && root.isDirectory()) {
             File file = root.openNextFile();
@@ -335,12 +436,13 @@ void APManager::setupRoutes() {
             }
             root.close();
         }
+        digitalWrite(5, HIGH);
 
         PrinterConfig defaultCfg;
         ConfigManager::saveConfig(defaultCfg);
 
         _server.send(200, "text/html; charset=utf-8", "<html><body style='font-family:sans-serif; background:#0f172a; color:#fff; text-align:center; padding-top:50px;'><h2>SD kártya törölve és alaphelyzetbe állítva! Az eszköz újraindul...</h2></body></html>");
-        delay(1500);
+        delay(1000);
         ESP.restart();
     });
 }

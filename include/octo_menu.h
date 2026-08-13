@@ -4,22 +4,22 @@
 #include <TFT_eSPI.h>
 #include "octo_client.h"
 #include "octo_bedlevel_menu.h"
-#include "octo_other_calibration.h" // ✅ ÚJ: Bekötöttük az egyéb kalibrációs menüt is
+#include "octo_other_calibration.h"
 
 class OctoMenu {
 public:
     enum SubState {
-        SUB_MAIN = 0,       // Karbantartási Főmenü (2x2 rács)
-        SUB_TUNE = 1,       // Élő Hangolás Nézet (Nyomtatás közben)
-        SUB_Z_OFFSET = 2,   // Z-Offset Kalibrációs Nézet
-        SUB_MESH = 3,       // Bed Mesh Kezelő Menü
-        SUB_SHOW_MESH = 4,  // Bed Mesh Négyzethálós Kirajzolás
-        SUB_PREPARE = 5,    // Előkészítés almenü (AutoHome)
-        SUB_CONTROL = 6,    // Irányítás almenü (üres)
-        SUB_CALIBRATION = 7,// Kalibráció almenü (Z-offset, Bed mesh)
-        SUB_FILAMENT = 8,   // Filament csere almenü (üres)
-        SUB_BED_LEVEL = 9,  // Asztalszintezés (Leveling) állapota[cite: 15]
-        SUB_OTHER_CALIB = 10 // ✅ ÚJ: Egyéb kalibrációk (E-Step, PID, MPC)
+        SUB_MAIN = 0,
+        SUB_TUNE = 1,
+        SUB_Z_OFFSET = 2,
+        SUB_MESH = 3,
+        SUB_SHOW_MESH = 4,
+        SUB_PREPARE = 5,
+        SUB_CONTROL = 6,
+        SUB_CALIBRATION = 7,
+        SUB_FILAMENT = 8,
+        SUB_BED_LEVEL = 9,
+        SUB_OTHER_CALIB = 10
     };
 
     OctoMenu(TFT_eSPI* tft);
@@ -38,8 +38,8 @@ private:
     int _subState = SUB_MAIN;
     bool _forceRedraw = true;
     
-    OctoBedLevelMenu _bedLevelMenu;       // A Leveling menü objektuma[cite: 15]
-    OctoOtherCalibrationMenu _otherCalibMenu; // ✅ ÚJ: Az egyéb kalibrációk objektuma
+    OctoBedLevelMenu _bedLevelMenu;
+    OctoOtherCalibrationMenu _otherCalibMenu;
     
     bool _showUnsupportedPopup = false;
     uint32_t _unsupportedPopupStartMs = 0;
@@ -60,10 +60,10 @@ private:
     void drawTuneMenu(OctoClient* client);
     void drawZOffsetMenu();
     void drawMeshMenu(OctoClient* client = nullptr);
+    void drawMeshLoadingScreen();
     void drawShowMeshMenu(OctoClient* client);
     void updatePrepareMenu(OctoClient* client);
 
-    // Segédfunkciók az animációhoz és a felugró ablakhoz
     void drawMeshSavedPopup();
     void updateMeshButtons(OctoClient* client);
     uint16_t getPulsingColor();

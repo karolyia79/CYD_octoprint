@@ -1,11 +1,11 @@
-#include "octo_other_calibration.h"
+#include "octo_other_calibration_mqtt.h"
 #include "lang_manager.h"
 #include "ui_utils.h"
 #include "config_manager.h"
 
-OctoOtherCalibrationMenu::OctoOtherCalibrationMenu(TFT_eSPI* tft) : _tft(tft) {}
+OctoOtherCalibrationMenuMqtt::OctoOtherCalibrationMenuMqtt(TFT_eSPI* tft) : _tft(tft) {}
 
-void OctoOtherCalibrationMenu::init() {
+void OctoOtherCalibrationMenuMqtt::init() {
     _subState = 0;
     _estepSubState = 0;
     _pidSubState = 0;
@@ -17,7 +17,7 @@ void OctoOtherCalibrationMenu::init() {
     _mpcCommandSent = false;
 }
 
-void OctoOtherCalibrationMenu::draw(OctoClient* client) {
+void OctoOtherCalibrationMenuMqtt::draw(OctoClientMqtt* client) {
     if (_showPopup) {
         if (_forceRedraw) {
             drawPopup();
@@ -52,12 +52,12 @@ void OctoOtherCalibrationMenu::draw(OctoClient* client) {
     _forceRedraw = false;
 }
 
-void OctoOtherCalibrationMenu::drawMainMenu() {
+void OctoOtherCalibrationMenuMqtt::drawMainMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
-    _tft->drawString(LangManager::get("calib_other_title_http"), 160, 48, 2);
+    _tft->drawString(LangManager::get("calib_other_title"), 160, 48, 2);
 
     UIUtils::drawButton(_tft, 20, 75, 280, 36, LangManager::get("calib_btn_estep"), theme.cardBg, theme.text, false, 2, 5);
     UIUtils::drawButton(_tft, 20, 120, 280, 36, LangManager::get("calib_btn_pid"), theme.cardBg, theme.text, false, 2, 5);
@@ -66,7 +66,7 @@ void OctoOtherCalibrationMenu::drawMainMenu() {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::drawEStepMaterialMenu() {
+void OctoOtherCalibrationMenuMqtt::drawEStepMaterialMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -84,7 +84,7 @@ void OctoOtherCalibrationMenu::drawEStepMaterialMenu() {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::drawEStepHeatingMenu(OctoClient* client) {
+void OctoOtherCalibrationMenuMqtt::drawEStepHeatingMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -110,7 +110,7 @@ void OctoOtherCalibrationMenu::drawEStepHeatingMenu(OctoClient* client) {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::drawEStepMeasureMenu() {
+void OctoOtherCalibrationMenuMqtt::drawEStepMeasureMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -138,7 +138,7 @@ void OctoOtherCalibrationMenu::drawEStepMeasureMenu() {
     UIUtils::drawButton(_tft, 255, 122, 45, 30, "+1", theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::drawPidMenu() {
+void OctoOtherCalibrationMenuMqtt::drawPidMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -155,13 +155,13 @@ void OctoOtherCalibrationMenu::drawPidMenu() {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::drawPidRunningMenu(OctoClient* client) {
+void OctoOtherCalibrationMenuMqtt::drawPidRunningMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     static float lastTemp = -999.0f;
     static bool lastPidDone = false;
 
     float currentTemp = client ? client->getData().nozzleTemp : 0.0f;
-    bool pidDone = client ? client->isPidFinished() : false;
+    bool pidDone = false; 
 
     if (_forceRedraw) {
         _tft->fillRect(10, 45, 300, 190, theme.bg);
@@ -198,7 +198,7 @@ void OctoOtherCalibrationMenu::drawPidRunningMenu(OctoClient* client) {
     }
 }
 
-void OctoOtherCalibrationMenu::drawMpcMenu() {
+void OctoOtherCalibrationMenuMqtt::drawMpcMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -215,13 +215,13 @@ void OctoOtherCalibrationMenu::drawMpcMenu() {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::drawMpcRunningMenu(OctoClient* client) {
+void OctoOtherCalibrationMenuMqtt::drawMpcRunningMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     static float lastTemp = -999.0f;
     static bool lastMpcDone = false;
 
     float currentTemp = client ? client->getData().nozzleTemp : 0.0f;
-    bool mpcDone = client ? client->isMpcFinished() : false;
+    bool mpcDone = false;
 
     if (_forceRedraw) {
         _tft->fillRect(10, 45, 300, 190, theme.bg);
@@ -258,7 +258,7 @@ void OctoOtherCalibrationMenu::drawMpcRunningMenu(OctoClient* client) {
     }
 }
 
-void OctoOtherCalibrationMenu::drawPopup() {
+void OctoOtherCalibrationMenuMqtt::drawPopup() {
     _tft->fillRoundRect(25, 65, 270, 120, 8, _tft->color565(30, 30, 30));
     _tft->drawRoundRect(25, 65, 270, 120, 8, _popupColor);
     _tft->drawRoundRect(26, 66, 268, 118, 7, _popupColor);
@@ -274,7 +274,7 @@ void OctoOtherCalibrationMenu::drawPopup() {
     UIUtils::drawButton(_tft, 95, 153, 130, 26, LangManager::get("btn_ok"), _tft->color565(60, 60, 60), TFT_WHITE, false, 1, 4);
 }
 
-void OctoOtherCalibrationMenu::saveEStepCalibration(OctoClient* client) {
+void OctoOtherCalibrationMenuMqtt::saveEStepCalibration(OctoClientMqtt* client) {
     if (client) {
         float actualExtruded = 100.0f - _estepDiff;
         if (actualExtruded > 0) {
@@ -293,7 +293,7 @@ void OctoOtherCalibrationMenu::saveEStepCalibration(OctoClient* client) {
     _forceRedraw = true;
 }
 
-int OctoOtherCalibrationMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* client) {
+int OctoOtherCalibrationMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     if (_showPopup) {
         if (y >= 150 && y <= 185 && x >= 95 && x <= 225) {
@@ -304,7 +304,6 @@ int OctoOtherCalibrationMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* cl
             _mpcSubState = 0;
             _pidCommandSent = false;
             _mpcCommandSent = false;
-            if (client) client->resetCalibrationFlags();
             _forceRedraw = true;
         }
         return 1;
@@ -321,11 +320,11 @@ int OctoOtherCalibrationMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* cl
         }
         if (y >= 120 && y <= 156) {
             UIUtils::pressFeedback(_tft, 20, 120, 280, 36, LangManager::get("calib_btn_pid"), theme.cardBg, theme.text, 2, 5);
-            _subState = 2; _pidSubState = 0; _pidCommandSent = false; if (client) client->resetCalibrationFlags(); _forceRedraw = true; return 1;
+            _subState = 2; _pidSubState = 0; _pidCommandSent = false; _forceRedraw = true; return 1;
         }
         if (y >= 165 && y <= 201) {
             UIUtils::pressFeedback(_tft, 20, 165, 280, 36, LangManager::get("calib_btn_mpc"), theme.cardBg, theme.text, 2, 5);
-            _subState = 3; _mpcSubState = 0; _mpcCommandSent = false; if (client) client->resetCalibrationFlags(); _forceRedraw = true; return 1;
+            _subState = 3; _mpcSubState = 0; _mpcCommandSent = false; _forceRedraw = true; return 1;
         }
         return -1;
     }
@@ -406,21 +405,6 @@ int OctoOtherCalibrationMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* cl
                 }
                 return 1;
             }
-        } else if (_pidSubState == 1) {
-            bool pidDone = client ? client->isPidFinished() : false;
-            if (pidDone && y >= 155 && y <= 193) {
-                UIUtils::pressFeedback(_tft, 20, 155, 280, 38, LangManager::get("calib_btn_save_eeprom"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
-                if (client) {
-                    client->sendGcodeCommand("M500");
-                }
-                _popupTitle = LangManager::get("calib_popup_save_success");
-                _popupMsg1 = LangManager::get("calib_popup_pid_saved");
-                _popupMsg2 = LangManager::get("calib_popup_eeprom_m500");
-                _popupColor = TFT_GREEN;
-                _showPopup = true;
-                _forceRedraw = true;
-                return 1;
-            }
         }
         return 1;
     }
@@ -429,15 +413,6 @@ int OctoOtherCalibrationMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* cl
         if (_mpcSubState == 0) {
             if (y >= 208) { _subState = 0; _forceRedraw = true; return 1; }
             if (y >= 160 && y <= 198) {
-                if (client && !client->supportsCustomMesh()) {
-                    _popupTitle = LangManager::get("calib_popup_err_unsupported");
-                    _popupMsg1 = LangManager::get("calib_popup_mpc_no_fw1");
-                    _popupMsg2 = LangManager::get("calib_popup_mpc_no_fw2");
-                    _popupColor = TFT_RED;
-                    _showPopup = true;
-                    _forceRedraw = true;
-                    return 1;
-                }
                 if (!_mpcCommandSent) {
                     UIUtils::pressFeedback(_tft, 20, 160, 280, 38, LangManager::get("calib_mpc_start_btn"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
                     if (client) {
@@ -447,21 +422,6 @@ int OctoOtherCalibrationMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* cl
                     _mpcSubState = 1;
                     _forceRedraw = true;
                 }
-                return 1;
-            }
-        } else if (_mpcSubState == 1) {
-            bool mpcDone = client ? client->isMpcFinished() : false;
-            if (mpcDone && y >= 155 && y <= 193) {
-                UIUtils::pressFeedback(_tft, 20, 155, 280, 38, LangManager::get("calib_btn_save_eeprom"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
-                if (client) {
-                    client->sendGcodeCommand("M500");
-                }
-                _popupTitle = LangManager::get("calib_popup_save_success");
-                _popupMsg1 = LangManager::get("calib_popup_mpc_saved");
-                _popupMsg2 = LangManager::get("calib_popup_eeprom_m500");
-                _popupColor = TFT_GREEN;
-                _showPopup = true;
-                _forceRedraw = true;
                 return 1;
             }
         }

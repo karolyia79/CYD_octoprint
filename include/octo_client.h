@@ -16,6 +16,7 @@ struct OctoPrinterData {
     float bedTemp = 0;
     float bedTarget = 0;
     int speed = 100;
+    bool mqttActive = false;
     int progress = 0;
     String remainingTime = "-";
     String totalTime;
@@ -24,13 +25,16 @@ struct OctoPrinterData {
     int meshRows = 3;
     int meshCols = 3;
     float bedMesh[MAX_MESH_SIZE][MAX_MESH_SIZE] = {0};
+    bool meshLoaded = false;
 };
 
 class OctoClient {
 public:
     OctoClient(const String& ip, const String& apiKey);
     void update();
+    
     const OctoPrinterData& getData() const { return _data; }
+    OctoPrinterData& getData() { return _data; }
 
     void sendGcodeCommand(const String& gcode);
     void setNozzleTarget(float temp);
@@ -38,7 +42,8 @@ public:
     void setSpeed(int percent);
     void adjustZOffset(float delta);
 
-    bool isPluginMissing() const { return _pluginMissing; }    void checkPluginAvailability();
+    bool isPluginMissing() const { return _pluginMissing; }
+    void checkPluginAvailability();
 
     void autoHome();
     void disableSteppers(); 
@@ -50,9 +55,13 @@ public:
     void fetchBedMesh();
 
     bool isMeshBuilding() const { return _meshBuildState != 0; }
+    void setMeshBuildState(int state) { _meshBuildState = state; }
+    
+    int getMeshPhase() const { return _meshPhase; }
+    void setMeshPhase(int phase) { _meshPhase = phase; }
+
     bool isHoming() const { return _isHoming; }
 
-    // PID és MPC kész állapot ellenőrzése
     bool isPidFinished() const { return _pidFinished; }
     bool isMpcFinished() const { return _mpcFinished; }
     void resetCalibrationFlags() { _pidFinished = false; _mpcFinished = false; }
@@ -62,6 +71,11 @@ public:
 
     bool shouldShowNoMeshPopup() const { return _showNoMeshPopup; }
     void dismissNoMeshPopup() { _showNoMeshPopup = false; }
+    void setShowNoMeshPopup(bool state) { _showNoMeshPopup = state; }
+    
+    void setHoming(bool h);
+
+    void setMqttActive(bool active) { _data.mqttActive = active; }
 
 private:
     String _ip;
@@ -70,6 +84,8 @@ private:
 
     int _meshBuildState = 0; 
     int _meshBuildSize = 3;
+    bool _isMeshBuilding = false;
+    int _meshPhase = 0; // 0: Idle, 1: Homing, 2: Heating, 3: Probing, 4: Saving
     
     bool _isHoming = false;
     uint32_t _homeTimer = 0;

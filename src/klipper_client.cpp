@@ -24,12 +24,10 @@ void KlipperClient::update() {
         String webhooksState = status["webhooks"]["state"].as<String>();
         String printState = status["print_stats"]["state"].as<String>();
 
-        // Ha a Klipper éppen nyomtat vagy szünetel, a print_stats állapotát használjuk,
-        // így a MainScreen azonnal felismeri (_isPrinting = true), és kirajzolja a gombokat.
         if (printState != "null" && printState != "" && printState != "standby" && printState != "complete") {
-            _data.status = printState; // pl. "printing", "paused"
+            _data.status = printState; 
         } else {
-            _data.status = webhooksState; // pl. "ready"
+            _data.status = webhooksState; 
         }
 
         _data.name = status["print_stats"]["filename"].as<String>();
@@ -55,10 +53,6 @@ void KlipperClient::update() {
     }
     http.end();
 }
-
-#include "klipper_client.h"
-
-// ... az eredeti Constructor és update() megmarad ...
 
 void KlipperClient::sendGcode(const String& gcode) {
     if (WiFi.status() != WL_CONNECTED) return;
@@ -90,6 +84,5 @@ void KlipperClient::setSpeed(int percent) {
 }
 
 void KlipperClient::adjustZOffset(float delta) {
-    // Klipper Z_ADJUST parancs élő módosításhoz
     sendGcode("SET_GCODE_OFFSET Z_ADJUST=" + String(delta, 3) + " MOVE=1");
 }

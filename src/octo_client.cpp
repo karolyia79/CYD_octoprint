@@ -1,382 +1,124 @@
 #include "octo_client.h"
 #include "lang_manager.h"
 
-OctoClient::OctoClient(const String& ip, const String& apiKey) : _ip(ip), _apiKey(apiKey) {}
+OctoClient::OctoClient(const String& ip, const String& apiKey) 
+    : _ip(ip), _apiKey(apiKey) {}
+
+void OctoClient::setHoming(bool h) {
+    _isHoming = h;
+    if (h) _homeTimer = millis();
+    Serial.printf("[%lu ms] [OCTO_BASE] setHoming(%s) hívva, _homeTimer frissítve.\n", millis(), h ? "TRUE" : "FALSE");
+}
 
 void OctoClient::update() {
     if (WiFi.status() != WL_CONNECTED) {
-        _data.status = "wifi_no_wifi"; 
         _data.connected = false;
         return;
     }
 
-    // 1. Job adatok lekérdezése (/api/job)
     HTTPClient http;
-    String url = "http://" + _ip + "/api/job?apikey=" + _apiKey;
+    String url = "http://" + _ip + "/api/printer?apikey=" + _apiKey;
     http.begin(url);
-    http.addHeader("X-Api-Key", _apiKey);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    http.setTimeout(4000); 
+    http.setTimeout(3000);
 
     int httpCode = http.GET();
-    if (httpCode > 0 && httpCode == HTTP_CODE_OK) {
-        DynamicJsonDocument doc(2048);
-        deserializeJson(doc, http.getStream()); 
-
-        JsonObject job = doc["job"];
-        _data.name = job["file"]["display"].as<String>();
-        if (_data.name == "null" || _data.name == "") {
-            _data.name = job["file"]["name"].as<String>();
-        }
-        if (_data.name == "null" || _data.name == "") {
-            _data.name = "octo_default_name";
-        }
-
-        float estimatedSec = job["estimatedPrintTime"] | 0.0f;
-        if (estimatedSec > 0) {
-            int totalSec = (int)estimatedSec;
-            int hours = totalSec / 3600;
-            int minutes = (totalSec % 3600) / 60;
-            
-            if (hours > 0) {
-                _data.totalTime = String(hours) + "h " + String(minutes) + "m";
-            } else {
-                _data.totalTime = String(minutes) + "m";
-            }
-        } else {
-            _data.totalTime = "";
-        }
-
-        JsonObject progress = doc["progress"];
-        float rawCompletion = progress["completion"] | 0.0f;
-        _data.progress = (int)(rawCompletion + 0.5f);
-
-        int printTimeLeft = progress["printTimeLeft"] | -1;
-        if (printTimeLeft >= 0) {
-            int hours = printTimeLeft / 3600;
-            int mins = (printTimeLeft % 3600) / 60;
-            _data.remainingTime = String(hours) + "h " + String(mins) + "m";
-        } else {
-            _data.remainingTime = "octo_status_unknown";
-        }
+    if (httpCode == HTTP_CODE_OK) {
         _data.connected = true;
-        
-        String jobState = doc["state"].as<String>();
-        if (jobState != "null" && jobState.length() > 0) {
-            _data.status = jobState;
-        } else {
-            _data.status = "octo_status_working";
-        }
+        DynamicJsonDocument doc(4096);
+        deserializeJson(doc, http.getStream());
+
+        JsonObject temperature = doc["temperature"];
+        _data.nozzleTemp = temperature["tool0"]["actual"] | 0.0f;
+        _data.nozzleTarget = temperature["tool0"]["target"] | 0.0f;
+        _data.bedTemp = temperature["bed"]["actual"] | 0.0f;
+        _data.bedTarget = temperature["bed"]["target"] | 0.0f;
+
+        String stateFlags = doc["state"]["text"] | "Operational";
+        _data.status = stateFlags;
+
+        Serial.printf("[%lu ms] [OCTO_BASE HTTP] GET /api/printer OK | Status: %s | Temp: N=%.1f/%.1f B=%.1f/%.1f\n",
+                      millis(), _data.status.c_str(), _data.nozzleTemp, _data.nozzleTarget, _data.bedTemp, _data.bedTarget);
     } else {
+        Serial.printf("[%lu ms] [OCTO_BASE HTTP] GET /api/printer HIBA! Kod: %d\n", millis(), httpCode);
         _data.connected = false;
-        _data.status = "wifi_conn_error";
-        Serial.printf("[RX] HTTP GET /api/job Error Code: %d\n", httpCode);
     }
     http.end();
 
-    // 2. Hőmérséklet & Státusz (/api/printer)
-    HTTPClient httpPrn;
-    String prnUrl = "http://" + _ip + "/api/printer?apikey=" + _apiKey;
-    httpPrn.begin(prnUrl);
-    httpPrn.addHeader("X-Api-Key", _apiKey);
-    httpPrn.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    httpPrn.setTimeout(4000);
-    
-    int codePrn = httpPrn.GET();
-    if (codePrn > 0 && codePrn == HTTP_CODE_OK) {
-        DynamicJsonDocument pDoc(4096); 
-        DeserializationError pErr = deserializeJson(pDoc, httpPrn.getStream()); 
-
-        if (!pErr) {
-            JsonObject temp = pDoc["temperature"];
-            if (!temp.isNull()) {
-                if (temp.containsKey("tool0")) {
-                    _data.nozzleTemp = temp["tool0"]["actual"] | 0.0;
-                    _data.nozzleTarget = temp["tool0"]["target"] | 0.0;
-                }
-                if (temp.containsKey("bed")) {
-                    _data.bedTemp = temp["bed"]["actual"] | 0.0;
-                    _data.bedTarget = temp["bed"]["target"] | 0.0;
-                }
-            }
-
-            // --- RÉSZLETES RX HŐMÉRSÉKLET ÉS ÁLLAPOT LOGOLÁS ---
-            Serial.printf("[RX] Printer State -> Nozzle: %.1fC (Target: %.1fC) | Bed: %.1fC (Target: %.1fC)\n", 
-                _data.nozzleTemp, _data.nozzleTarget, _data.bedTemp, _data.bedTarget);
-
-            JsonObject stateObj = pDoc["state"];
-            if (!stateObj.isNull()) {
-                String printerStateText = stateObj["text"].as<String>();
-                if (printerStateText != "null" && printerStateText.length() > 0) {
-                    _data.status = printerStateText;
-                    Serial.println("[RX] Printer Status Text: " + printerStateText);
-                }
-            }
-
-            // --- TERMINÁLOS / SERIAL MONITOROZÁS (RX) ---
-            JsonArray logs = pDoc["logs"];
-            if (!logs.isNull()) {
-                for (JsonVariant v : logs) {
-                    String line = v.as<String>();
-                    handleIncomingLine(line);
-                }
+    // --- HOMING TIMEOUT KEZELÉS ---
+    // HA MQTT AKTÍV: Az MQTT watcher felel a homing lezárásáért!
+    // A 12 másodperces vak időzítő CSAK sima HTTP (REST API) módban futhat!
+    if (_isHoming) {
+        if (!_data.mqttActive) {
+            unsigned long homingDuration = millis() - _homeTimer;
+            Serial.printf("[%lu ms] [OCTO_BASE MONITOR (HTTP MÓD)] _isHoming aktív, eltelt idő: %lu ms\n", millis(), homingDuration);
+            if (homingDuration > 12000) { 
+                Serial.printf("[%lu ms] [OCTO_BASE TIMEOUT] _isHoming KIKAPCSOLVA 12s Időtúllépés miatt!\n", millis());
+                _isHoming = false;
             }
         } else {
-            Serial.println("[RX] JSON Parse Error in /api/printer");
-        }
-    } else {
-        Serial.printf("[RX] HTTP GET /api/printer Error Code: %d\n", codePrn);
-    }
-    httpPrn.end();
-
-    // --- IDŐALAPÚ AUTOHOME KEZELÉS ---
-    if (_isHoming) {
-        if (millis() - _homeTimer > 12000) { 
-            Serial.println("[OctoClient] AutoHome időzítés letelt, kész.");
-            _isHoming = false;
+            Serial.printf("[%lu ms] [OCTO_BASE MONITOR (MQTT MÓD)] _isHoming aktív, MQTT watcher vezérli (HTTP Timeout letiltva).\n", millis());
         }
     }
 
-    // 3. MESH ÉPÍTÉS ÁLLAPOTGÉP
+    // --- MESH BUILD & FŰTÉS FÁZISKEZELÉS (HTTP Fallback) ---
     if (_meshBuildState != 0) {
-        uint32_t elapsed = millis() - _meshTimer;
-
-        switch (_meshBuildState) {
-            case 1: 
-                if (!_isHoming || elapsed > 9500) {
-                    Serial.println("[OctoClient] G28 kész. Send: M190 S60 (Fűtés indítása)");
-                    setBedTarget(60);
-                    sendGcodeCommand("M190 S60");
-                    
-                    _meshBuildState = 2; 
-                    _meshTimer = millis();
-                }
-                break;
-
-            case 2: 
-                if (_data.bedTemp >= 58.0 || elapsed > 180000) {
-                    Serial.println("[OctoClient] Tálca elérte a hőmérsékletet. Send: G29 (Mesh mérés)");
-                    String meshCmd = "G29";
-                    if (_meshBuildSize != 3 && supportsCustomMesh()) {
-                        meshCmd = "G29 P" + String(_meshBuildSize);
-                    }
-                    sendGcodeCommand(meshCmd);
-                    
-                    _meshBuildState = 3; 
-                    _meshTimer = millis();
-                }
-                break;
-
-            case 3: { 
-                uint32_t probingDuration = (_meshBuildSize >= 5) ? 150000 : 75000;
-                if (elapsed > probingDuration) {
-                    Serial.println("[OctoClient] Mesh kész. Send: M500 (EEPROM mentés)");
-                    sendGcodeCommand("M500");
-                    
-                    _meshBuildState = 4; 
-                    _meshTimer = millis();
-                }
-                break;
+        Serial.printf("[%lu ms] [OCTO_BASE MESH] Fázis: %d, Eltelt idő: %lu ms\n", millis(), _meshPhase, millis() - _meshTimer);
+        if (_meshPhase == 1) {
+            // 1. Fázis: Várjuk, hogy a G28 lemenjen (időzítve HTTP módban)
+            if (!_data.mqttActive && (millis() - _meshTimer > 8000)) {
+                _meshPhase = 2; // 2. Fázis: Fűtés indítása 60 fokra
+                Serial.printf("[%lu ms] %s\n", millis(), LangManager::get("octo_log_g28_done_heating").c_str());
+                setBedTarget(60);
+                _meshTimer = millis();
             }
-
-            case 4: 
-                if (elapsed > 2500) {
-                    Serial.println("[OctoClient] M500 kész. Send: M140 S0 (Cooldown)");
-                    sendGcodeCommand("M140 S0"); 
-                    
-                    _meshBuildState = 5; 
-                    _meshTimer = millis();
-                }
-                break;
-
-            case 5: 
-                if (elapsed > 1000) {
-                    Serial.println("[OctoClient SUCCESS] Mesh folyamat sikeresen lezárult!");
-                    _data.bedTarget = 0;
-                    _showMeshSavedPopup = true;
-                    _popupStartMs = millis();
-                    _meshBuildState = 0; 
-                }
-                break;
-        }
-
-        if (millis() - _meshTimer > 360000 && _meshBuildState != 0) {
-            Serial.println("[OctoClient TIMEOUT] Mesh építés időtúllépés!");
-            _meshBuildState = 0;
-        }
-    }
-
-    if (_showMeshSavedPopup && (millis() - _popupStartMs > 4000)) {
-        _showMeshSavedPopup = false;
-    }
-}
-
-void OctoClient::handleIncomingLine(const String& line) {
-    // Minden érkező sor kiírása a Serial Monitorra
-    Serial.println("[RX] " + line);
-
-    // PID Autotune befejezésének szűrése
-    if (line.indexOf("PID Autotune finished!") >= 0) {
-        _pidFinished = true;
-        Serial.println("[OctoClient] PID kalibrálás sikeresen lefutott!");
-    }
-
-    // MPC Autotune befejezésének szűrése
-    if ((line.indexOf("MPC") >= 0 || line.indexOf("Model Predictive Control") >= 0) && 
-        (line.indexOf("finished") >= 0 || line.indexOf("completed") >= 0 || line.indexOf("ok") >= 0)) {
-        _mpcFinished = true;
-        Serial.println("[OctoClient] MPC kalibrálás sikeresen lefutott!");
-    }
-}
-
-void OctoClient::sendPostRequest(const String& endpoint, const String& jsonPayload) {
-    if (WiFi.status() != WL_CONNECTED) return;
-    HTTPClient http;
-    String url = "http://" + _ip + endpoint + "?apikey=" + _apiKey;
-    http.begin(url);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Api-Key", _apiKey);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    http.setTimeout(5000);
-    int respCode = http.POST(jsonPayload);
-    
-    // RX válasz logolása a POST kérésre
-    Serial.printf("[RX] POST %s -> HTTP Response Code: %d\n", endpoint.c_str(), respCode);
-    http.end();
-}
-
-void OctoClient::sendGcodeCommand(const String& gcode) {
-    Serial.printf("[TX] Gcode: %s\n", gcode.c_str());
-    String payload = "{\"commands\":[\"" + gcode + "\"]}";
-    sendPostRequest("/api/printer/command", payload);
-}
-
-void OctoClient::setNozzleTarget(float temp) {
-    _data.nozzleTarget = temp;
-    Serial.printf("[TX] Set Nozzle Target: %.1f C\n", temp);
-    String payload = "{\"command\":\"target\",\"targets\":{\"tool0\":" + String((int)temp) + "}}";
-    sendPostRequest("/api/printer/tool", payload);
-}
-
-void OctoClient::setBedTarget(float temp) {
-    _data.bedTarget = temp;
-    Serial.printf("[TX] Set Bed Target: %.1f C\n", temp);
-    String payload = "{\"command\":\"target\":" + String((int)temp) + "}";
-    sendPostRequest("/api/printer/bed", payload);
-}
-
-void OctoClient::setSpeed(int percent) {
-    if (percent < 10) percent = 10;
-    if (percent > 300) percent = 300;
-    _data.speed = percent;
-    Serial.printf("[TX] Set Speed: %d%%\n", percent);
-    String payload = "{\"command\":\"feedrate\",\"factor\":" + String(percent) + "}";
-    sendPostRequest("/api/printer/printhead", payload);
-}
-
-void OctoClient::adjustZOffset(float delta) {
-    sendGcodeCommand("M290 Z" + String(delta, 3));
-}
-
-void OctoClient::autoHome() {
-    Serial.println("[TX] Auto Home (G28)");
-    sendGcodeCommand("G28");
-    _isHoming = true;
-    _homeTimer = millis();
-}
-
-void OctoClient::disableSteppers() {
-    Serial.println("[TX] Steppers Off (M84)");
-    sendGcodeCommand("M84");
-}
-
-void OctoClient::homeZ() {
-    sendGcodeCommand("G28 Z");
-}
-
-void OctoClient::saveConfig() {
-    sendGcodeCommand("M500");
-}
-
-void OctoClient::autoBuildMesh(int size) {
-    _meshBuildSize = size;
-    sendGcodeCommand("G28");
-    _isHoming = true;       
-    _homeTimer = millis();
-    _meshBuildState = 1; 
-    _meshTimer = millis();
-    _showMeshSavedPopup = false;
-}
-
-void OctoClient::fetchBedMesh() {
-    if (WiFi.status() != WL_CONNECTED) {
-        _showNoMeshPopup = true;
-        return;
-    }
-
-    String url = "http://" + _ip + "/api/settings?apikey=" + _apiKey;
-    HTTPClient http;
-    http.begin(url);
-    http.addHeader("X-Api-Key", _apiKey);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    http.setTimeout(10000);
-
-    int httpCode = http.GET();
-    Serial.printf("[RX] Fetch Bed Mesh HTTP Code: %d\n", httpCode);
-    bool success = false;
-
-    if (httpCode > 0 && httpCode == HTTP_CODE_OK) {
-        DynamicJsonDocument doc(49152);
-        DeserializationError error = deserializeJson(doc, http.getStream());
-
-        if (!error) {
-            JsonArray meshArray = doc["plugins"]["bedlevelvisualizer"]["stored_mesh"].as<JsonArray>();
-            int rows = meshArray.size();
-            if (rows > 0 && rows <= MAX_MESH_SIZE) {
-                int cols = meshArray[0].as<JsonArray>().size();
-                if (cols > 0 && cols <= MAX_MESH_SIZE) {
-                    _data.meshRows = rows;
-                    _data.meshCols = cols;
-
-                    for (int r = 0; r < rows; r++) {
-                        JsonArray rowArray = meshArray[r].as<JsonArray>();
-                        for (int c = 0; c < cols; c++) {
-                            _data.bedMesh[r][c] = rowArray[c].as<float>();
-                        }
-                    }
-                    success = true;
-                }
+        } else if (_meshPhase == 2) {
+            // 2. Fázis: Várjuk, hogy a bed elérje a 60 fokot
+            if (_data.bedTemp >= 59.0f || (_data.bedTarget > 0 && _data.bedTemp >= _data.bedTarget - 1.0f)) {
+                _meshPhase = 3; // 3. Fázis: G29 indítása
+                Serial.printf("[%lu ms] %s\n", millis(), LangManager::get("octo_log_bed_60_g29_start").c_str());
+                int size = _meshBuildState;
+                if (size == 5) sendGcodeCommand("G29 P1");
+                else sendGcodeCommand("G29");
+                _meshTimer = millis();
+            }
+        } else if (_meshPhase == 3) {
+            // 3. Fázis: G29 mérés várakozás
+            if (!_data.mqttActive && (millis() - _meshTimer > 30000)) {
+                _meshPhase = 4; // 4. Fázis: M500 mentés
+                Serial.printf("[%lu ms] %s\n", millis(), LangManager::get("octo_log_g29_done_m500").c_str());
+                sendGcodeCommand("M500");
+                _meshTimer = millis();
+            }
+        } else if (_meshPhase == 4) {
+            // 4. Fázis: M500 mentés után Cooldown és gombok feloldása
+            if (!_data.mqttActive && (millis() - _meshTimer > 2000)) {
+                _meshPhase = 0;
+                _meshBuildState = 0; // Gombok visszaváltanak
+                Serial.printf("[%lu ms] %s\n", millis(), LangManager::get("octo_log_save_done_cooldown").c_str());
+                setBedTarget(0);
             }
         }
     }
-    http.end();
-    _showNoMeshPopup = !success;
 }
 
 void OctoClient::checkPluginAvailability() {
     if (WiFi.status() != WL_CONNECTED) return;
 
-    String url = "http://" + _ip + "/api/plugins?apikey=" + _apiKey;
+    String url = "http://" + _ip + "/api/settings?apikey=" + _apiKey;
     HTTPClient http;
     http.begin(url);
-    http.addHeader("X-Api-Key", _apiKey);
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.setTimeout(5000);
 
     int httpCode = http.GET();
-    Serial.printf("[RX] Plugin Check HTTP Code: %d\n", httpCode);
-
     if (httpCode > 0 && httpCode == HTTP_CODE_OK) {
         DynamicJsonDocument doc(16384);
         DeserializationError error = deserializeJson(doc, http.getStream());
 
         if (!error) {
-            // Megkeressük, hogy a plugin benne van-e az engedélyezett/telepített pluginok között
-            // A plugin azonosítója általában "octoklipscreenbridge" vagy a kulcs a JSON-ban
             bool found = false;
-            JsonObject root = doc.as<JsonObject>();
-            
-            for (JsonPair kv : root) {
+            JsonObject pluginsObj = doc["plugins"].as<JsonObject>();
+            for (JsonPair kv : pluginsObj) {
                 String pluginKey = String(kv.key().c_str());
                 pluginKey.toLowerCase();
                 if (pluginKey.indexOf("klipscreen") >= 0 || pluginKey.indexOf("octoklipscreenbridge") >= 0) {
@@ -384,20 +126,126 @@ void OctoClient::checkPluginAvailability() {
                     break;
                 }
             }
+            _pluginMissing = !found;
+            Serial.printf("[%lu ms] [OCTO_BASE] Plugin ellenőrzés lefutott! Hiányzik: %s\n", millis(), _pluginMissing ? "IGEN" : "NEM");
+        }
+    }
+    http.end();
+}
 
-            if (found) {
-                _pluginMissing = false;
-                Serial.println("[OctoClient] Az OctoKlipscreenBridge plugin sikeresen detektálva a szerveren!");
-            } else {
-                _pluginMissing = true;
-                Serial.println("==========================================================");
-                Serial.println("[HIBA] Az OctoKlipscreenBridge plugin NEM TALÁLHATÓ az OctoPrint szerveren!");
-                Serial.println("Kérlek telepítsd innen: https://github.com/karolyia79/OctoklipscreenBridge");
-                Serial.println("==========================================================");
+void OctoClient::sendGcodeCommand(const String& gcode) {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    HTTPClient http;
+    String url = "http://" + _ip + "/api/printer/command?apikey=" + _apiKey;
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    DynamicJsonDocument doc(256);
+    JsonArray commands = doc.createNestedArray("commands");
+    commands.add(gcode);
+
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+
+    Serial.printf("[%lu ms] [OCTO_BASE HTTP TX] Parancs küldése: %s\n", millis(), gcode.c_str());
+    http.POST(jsonPayload);
+    http.end();
+}
+
+void OctoClient::autoHome() {
+    Serial.printf("[%lu ms] [OCTO_BASE] autoHome() hívva -> setHoming(true)\n", millis());
+    setHoming(true);
+    sendGcodeCommand("G28");
+}
+
+void OctoClient::disableSteppers() {
+    sendGcodeCommand("M84");
+}
+
+void OctoClient::homeZ() {
+    Serial.printf("[%lu ms] [OCTO_BASE] homeZ() hívva -> setHoming(true)\n", millis());
+    setHoming(true);
+    sendGcodeCommand("G28 Z");
+}
+
+void OctoClient::saveConfig() {
+    sendGcodeCommand("M500");
+}
+
+void OctoClient::setNozzleTarget(float temp) {
+    sendGcodeCommand("M104 S" + String((int)temp));
+}
+
+void OctoClient::setBedTarget(float temp) {
+    sendGcodeCommand("M140 S" + String((int)temp));
+}
+
+void OctoClient::setSpeed(int percent) {
+    sendGcodeCommand("M220 S" + String(percent));
+}
+
+void OctoClient::adjustZOffset(float delta) {
+    sendGcodeCommand("M290 Z" + String(delta, 3));
+}
+
+void OctoClient::autoBuildMesh(int size) {
+    _meshBuildState = size;
+    _meshPhase = 1; // 1. Fázis: Homing (G28) indítása
+    _meshTimer = millis();
+    Serial.printf("[%lu ms] [OctoClient] Bed Mesh indítva: G28 Homing...\n", millis());
+    sendGcodeCommand("G28");
+}
+
+void OctoClient::fetchBedMesh() {
+    if (WiFi.status() != WL_CONNECTED) return;
+    _data.meshLoaded = false;
+
+    HTTPClient http;
+    String url = "http://" + _ip + "/api/settings?apikey=" + _apiKey;
+    http.begin(url);
+    http.setTimeout(5000);
+
+    int httpCode = http.GET();
+    if (httpCode == HTTP_CODE_OK) {
+        DynamicJsonDocument doc(16384);
+        DeserializationError error = deserializeJson(doc, http.getStream());
+
+        if (!error) {
+            JsonObject plugins = doc["plugins"].as<JsonObject>();
+            JsonArray rows;
+
+            if (plugins.containsKey("octoklipscreenbridge") && plugins["octoklipscreenbridge"].containsKey("mesh")) {
+                rows = plugins["octoklipscreenbridge"]["mesh"].as<JsonArray>();
+            } else if (plugins.containsKey("klipscreen") && plugins["klipscreen"].containsKey("mesh")) {
+                rows = plugins["klipscreen"]["mesh"].as<JsonArray>();
             }
+
+            if (!rows.isNull() && rows.size() > 0) {
+                _data.meshRows = rows.size();
+                _data.meshCols = rows[0].as<JsonArray>().size();
+
+                for (int r = 0; r < _data.meshRows && r < 7; r++) {
+                    JsonArray col = rows[r].as<JsonArray>();
+                    for (int c = 0; c < _data.meshCols && c < 7; c++) {
+                        _data.bedMesh[r][c] = col[c] | 0.0f;
+                    }
+                }
+                _data.meshLoaded = true;
+                _showNoMeshPopup = false;
+                Serial.printf("[%lu ms] %s\n", millis(), LangManager::get("octo_log_mesh_download_ok").c_str());
+            } else {
+                _data.meshLoaded = true;
+                _showNoMeshPopup = true;
+                Serial.printf("[%lu ms] %s\n", millis(), LangManager::get("octo_log_mesh_download_empty").c_str());
+            }
+        } else {
+            _data.meshLoaded = true;
+            _showNoMeshPopup = true;
         }
     } else {
-        Serial.println("[OctoClient Warning] Nem sikerült lekérni a plugin listát az OctoPrint API-tól.");
+        _data.meshLoaded = true;
+        _showNoMeshPopup = true;
     }
     http.end();
 }

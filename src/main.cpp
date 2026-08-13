@@ -5,6 +5,10 @@
 #include "menuscreen.h"
 #include "octo_client.h"
 #include "klipper_client.h"
+#include "octo_client_mqtt.h"
+#include "mqtt_monitor.h"
+#include <WiFiClient.h>
+#include <PubSubClient.h>
 #include <CST820.h>
 
 TFT_eSPI tft = TFT_eSPI();
@@ -16,7 +20,12 @@ APManager apManager(&splash);
 bool isOctoEnabled = false;
 bool isKlipperEnabled = false;
 
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+MqttMonitor mqttMonitor;
+
 OctoClient* octoClient = nullptr;
+OctoClientMqtt* octoMqtt = nullptr;
 KlipperClient* klipperClient = nullptr;
 MainScreen* mainScreen = nullptr;
 MenuScreen* menuScreen = nullptr;
@@ -26,18 +35,36 @@ const unsigned long UPDATE_INTERVAL = 5000;
 
 TaskHandle_t NetworkTask = nullptr;
 
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    String msg;
+    for (unsigned int i = 0; i < length; i++) {
+        msg += (char)payload[i];
+    }
+    mqttMonitor.processMessage(String(topic), msg);
+}
+
 void networkTaskCode(void * pvParameters) {
     for(;;) {
         ConnectionManager::update();
+
+        if (octoMqtt) {
+            octoMqtt->update();
+        }
 
         unsigned long currentInterval = UPDATE_INTERVAL;
         if (octoClient && octoClient->isMeshBuilding()) {
             currentInterval = 1000;
         }
 
+        bool isMqttConnected = (octoMqtt && octoMqtt->isConnected());
+
         if (millis() - lastPrinterUpdate > currentInterval) {
-            if (isOctoEnabled && octoClient) octoClient->update();
-            if (isKlipperEnabled && klipperClient) klipperClient->update();
+            if (isOctoEnabled && octoClient && !isMqttConnected) {
+                octoClient->update(); 
+            }
+            if (isKlipperEnabled && klipperClient) {
+                klipperClient->update();
+            }
             lastPrinterUpdate = millis(); 
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -51,44 +78,41 @@ static int savedPage = 0;
 
 void setup() {
     Serial.begin(115200);
-    delay(500);
+    delay(200);
 
-    // 1. Tápellátás bekapcsolása (27-es pin)[cite: 10]
+    Serial.println("\n==============================================");
+    Serial.println("       OCTOKLIPSCREEN BOOT INDITASA           ");
+    Serial.println("==============================================\n");
+
     pinMode(27, OUTPUT);
     digitalWrite(27, LOW);
-    delay(50);
+    delay(30);
     digitalWrite(27, HIGH);
-    delay(100); 
+    delay(50); 
     
     Wire.begin(33, 32);
-    delay(50);
 
-    // 2. ELŐSZÖR A SPLASH / TFT INICIALIZÁLÁSA[cite: 10]
+    pinMode(15, OUTPUT);
+    digitalWrite(15, HIGH);
+    pinMode(5, OUTPUT);
+    digitalWrite(5, HIGH);
+
     splash.init();
-    splash.showMessage("System Init...", TFT_WHITE);
-    splash.drawProgressBar(10);
-    delay(150);
+    
+    bool sdSuccess = ConfigManager::init();
+    PrinterConfig cfg = ConfigManager::loadConfig(); 
 
-    // 3. SD KÁRTYA ÉS CONFIG[cite: 10]
-    if (!SD.begin()) {
-        Serial.println("SD Card initialization failed!");
+    if (!sdSuccess) {
+        Serial.println("[BOOT ERROR] SD Card / Config initialization failed!");
         splash.showMessage("SD Card Error!", TFT_RED);
-        delay(1500);
-    }
-    splash.drawProgressBar(30);
-    delay(150);
-
-    // 4. Konfiguráció és nyelv betöltése a JSON-ből[cite: 10]
-    if (ConfigManager::init()) {
-        PrinterConfig cfg = ConfigManager::loadConfig();
-        LangManager::loadLanguage(cfg.language); 
+        delay(1000);
     } else {
-        LangManager::loadLanguage("hu"); 
+        splash.showMessage("System Init...", TFT_WHITE);
+        splash.drawProgressBar(20);
     }
 
     splash.showMessage(LangManager::get("sys_loading"), TFT_WHITE);
     splash.drawProgressBar(40);
-    delay(150);
     
     touch.begin(); 
     pinMode(4, INPUT_PULLUP);
@@ -96,87 +120,112 @@ void setup() {
     Logger::init();
     Logger::logSystem(LangManager::get("sys_clean_boot"));
     
-    PrinterConfig cfg = ConfigManager::loadConfig();
     isOctoEnabled = cfg.octo_enabled;
     isKlipperEnabled = cfg.klipper_enabled;
 
     octoClient = new OctoClient(cfg.octo_ip, cfg.octo_key);
     klipperClient = new KlipperClient(cfg.klipper_ip);
 
-    mainScreen = new MainScreen(&tft, &touch, isOctoEnabled, isKlipperEnabled, octoClient);
+    mqttClient.setCallback(mqttCallback);
+    octoMqtt = new OctoClientMqtt(octoClient, &mqttClient, &mqttMonitor);
+
+    mainScreen = new MainScreen(&tft, &touch, isOctoEnabled, isKlipperEnabled, octoClient, octoMqtt);
     menuScreen = new MenuScreen(&tft, &touch); 
 
-    // --- RÉSZLETES BOOT ÉS ALRENDSZER ELLENŐRZÉS PROGRESS BARRAL ---[cite: 10]
-    
-    // 55%: Hálózati indítás (Gyors háttér WiFi csatlakozás kísérlet UI villanás nélkül)
     splash.showMessage(LangManager::get("sys_net_start"), TFT_ORANGE);
     splash.drawProgressBar(55);
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(); // Csatlakozás az ESP32-ben mentett adatokkal a háttérben
-
-    unsigned long wifiStart = millis();
     bool wifiConnected = false;
-    while (millis() - wifiStart < 4000) { // Max 4 mp várakozás a háttérben
-        if (WiFi.status() == WL_CONNECTED) {
-            wifiConnected = true;
-            break;
+
+    if (cfg.wifi_ssid != "") {
+        Serial.println("[NET] Csatlakozás megkísérlése: '" + cfg.wifi_ssid + "'...");
+        WiFi.disconnect(true);
+        delay(50);
+        WiFi.mode(WIFI_STA);
+        
+        if (cfg.use_static_ip && cfg.static_ip != "") {
+            IPAddress ip, gateway, subnet, dns;
+            if (ip.fromString(cfg.static_ip) && gateway.fromString(cfg.gateway) &&
+                subnet.fromString(cfg.subnet) && dns.fromString(cfg.dns)) {
+                WiFi.config(ip, gateway, subnet, dns);
+            }
         }
-        delay(100);
+        
+        WiFi.begin(cfg.wifi_ssid.c_str(), cfg.wifi_pass.c_str());
+
+        unsigned long wifiStart = millis();
+        while (millis() - wifiStart < 8000) { 
+            if (WiFi.status() == WL_CONNECTED) {
+                wifiConnected = true;
+                break;
+            }
+            delay(100);
+        }
+    } else {
+        Serial.println("[NET] Nincs elmentve SSID!");
     }
 
     if (!wifiConnected) {
-        // Ha nincs mentett WiFi vagy nem tud csatlakozni, átadjuk az irányítást az APManagernek (AP / Portal mód)
-        apManager.begin();
-        return; // Ha AP módba lépett, itt megállunk
+        Serial.println("[NET HIBA] Wi-Fi csatlakozás sikertelen! Átváltás AP módba...");
+        apManager.begin(); 
+        return; 
+    } else {
+        Serial.println("[NET SIKER] Csatlakozva a Wi-Fi hálózathoz! IP: " + WiFi.localIP().toString());
+        apManager.startServer();
     }
 
-    // 70%: OctoPrint API kapcsolat ellenőrzése[cite: 10]
-    splash.showMessage("OctoPrint API ellenőrzése...", TFT_WHITE);
+    splash.showMessage(LangManager::get("boot_octo_check"), TFT_WHITE);
     splash.drawProgressBar(70);
     if (isOctoEnabled && octoClient) {
         octoClient->update(); 
     }
-    delay(300);
 
-    // 85%: MQTT kapcsolat ellenőrzése[cite: 10]
-    splash.showMessage("MQTT kapcsolat ellenőrzése...", TFT_WHITE);
+    splash.showMessage(LangManager::get("boot_mqtt_check"), TFT_WHITE);
     splash.drawProgressBar(85);
-    delay(300);
+    bool mqttConnected = true;
+    if (isOctoEnabled && octoMqtt) {
+        octoMqtt->begin(cfg.octo_ip, 1883);
+        
+        unsigned long mqttStart = millis();
+        while (millis() - mqttStart < 1500) {
+            octoMqtt->update();
+            if (octoMqtt->isConnected()) break;
+            delay(50);
+        }
+        mqttConnected = octoMqtt->isConnected();
+    }
 
-    // 95%: OctoKlipscreenBridge plugin ellenőrzése a szerveren[cite: 10]
-    splash.showMessage("Bridge plugin ellenőrzése...", TFT_WHITE);
+    splash.showMessage(LangManager::get("boot_bridge_check"), TFT_WHITE);
     splash.drawProgressBar(95);
     if (isOctoEnabled && octoClient) {
         octoClient->checkPluginAvailability(); 
     }
-    delay(300);
 
-    // 100%: Teljesen letelt a progress bar[cite: 10]
-    splash.showMessage("Rendszer kész.", TFT_GREEN);
+    // Rendszer kész - Szabad memória kiírása a terminálba
+    splash.showMessage(LangManager::get("boot_sys_ready"), TFT_GREEN);
     splash.drawProgressBar(100);
-    delay(500);
+    delay(200);
 
-    // --- HIBAKEZELÉS A PROGRESS BAR UTÁN ---[cite: 10]
+    Serial.println("\n==============================================");
+    Serial.printf("[SYSTEM MEMORY] Indulás utáni szabad heap: %u byte\n", ESP.getFreeHeap());
+    Serial.printf("[SYSTEM MEMORY] Minimális szabad heap: %u byte\n", ESP.getMinFreeHeap());
+    Serial.println("==============================================\n");
+
     bool pluginMissing = (octoClient && octoClient->isPluginMissing());
+    bool mqttError = (isOctoEnabled && !pluginMissing && !mqttConnected);
 
-    if (pluginMissing) {
-        // Ha hiányzik a plugin, felrajzoljuk a hibaablakot és várunk érintésre
-        splash.showConnectedInfo(WiFi.localIP().toString(), isOctoEnabled, isKlipperEnabled, true);
-        Serial.println("[BOOT ERROR] Kritikus hiba / hiányzó plugin! Várakozás érintésre...");
+    if (pluginMissing || mqttError) {
+        splash.showConnectedInfo(WiFi.localIP().toString(), isOctoEnabled, isKlipperEnabled, pluginMissing, mqttConnected);
         while (true) {
             uint16_t tx, ty;
             if (splash.getTouch(&tx, &ty)) {
-                delay(200);
+                delay(150);
                 break;
             }
             delay(50);
         }
-    } else {
-        // Nincs hiba -> semmilyen ablak nem villan be, azonnal ugrunk a főképernyőre![cite: 10]
     }
 
-    // Átmenet a főképernyőre[cite: 10]
     tft.fillScreen(TFT_BLACK);
     if (mainScreen) {
         mainScreen->init();
@@ -205,7 +254,6 @@ void loop() {
         int touchAction = mainScreen->handleTouch();
 
         if (touchAction == 1) { 
-            // Oldal váltás
         } 
         else if (touchAction == 2) { 
             Serial.println("[ACTION] OctoPrint szüneteltetése");

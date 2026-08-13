@@ -1,18 +1,18 @@
-#include "octo_bedlevel_menu.h"
+#include "octo_bedlevel_menu_mqtt.h"
 #include "lang_manager.h"
 #include "ui_utils.h"
 #include "config_manager.h"
 
-OctoBedLevelMenu::OctoBedLevelMenu(TFT_eSPI* tft) : _tft(tft) {}
+OctoBedLevelMenuMqtt::OctoBedLevelMenuMqtt(TFT_eSPI* tft) : _tft(tft) {}
 
-void OctoBedLevelMenu::init() {
+void OctoBedLevelMenuMqtt::init() {
     _config = OctoConfigManager::loadConfig();
     _isHomed = false;
     _levelingStep = 0;
     _wizProcessing = false;
 }
 
-void OctoBedLevelMenu::draw(OctoClient* client) {
+void OctoBedLevelMenuMqtt::draw(OctoClientMqtt* client) {
     if (_subState == 0 && _forceRedraw) {
         drawMainMenu();
     } 
@@ -25,19 +25,19 @@ void OctoBedLevelMenu::draw(OctoClient* client) {
     _forceRedraw = false;
 }
 
-void OctoBedLevelMenu::drawMainMenu() {
+void OctoBedLevelMenuMqtt::drawMainMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
-    _tft->drawString(LangManager::get("bedlevel_title_http"), 160, 48, 2);
+    _tft->drawString(LangManager::get("bedlevel_title_mqtt"), 160, 48, 2);
 
     UIUtils::drawButton(_tft, 20, 75, 280, 45, LangManager::get("bedlevel_btn_wiz"), theme.cardBg, theme.text, false, 2, 5);
     UIUtils::drawButton(_tft, 20, 135, 280, 45, LangManager::get("bedlevel_btn_coords"), theme.cardBg, theme.text, false, 2, 5);
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoBedLevelMenu::drawWizard(OctoClient* client) {
+void OctoBedLevelMenuMqtt::drawWizard(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     if (_forceRedraw) {
         _tft->fillRect(10, 45, 300, 190, theme.bg);
@@ -81,7 +81,7 @@ void OctoBedLevelMenu::drawWizard(OctoClient* client) {
     }
 }
 
-void OctoBedLevelMenu::drawCoords() {
+void OctoBedLevelMenuMqtt::drawCoords() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
@@ -128,12 +128,12 @@ void OctoBedLevelMenu::drawCoords() {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-int OctoBedLevelMenu::handleTouch(uint16_t x, uint16_t y, OctoClient* client) {
+int OctoBedLevelMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     if (_subState == 0) {
         if (y >= 200) {
             UIUtils::pressFeedback(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
-            return 0; 
+            return 0;
         }
         if (y >= 75 && y <= 120) {
             UIUtils::pressFeedback(_tft, 20, 75, 280, 45, LangManager::get("bedlevel_btn_wiz"), theme.cardBg, theme.text, 2, 5);

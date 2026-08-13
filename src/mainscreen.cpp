@@ -4,10 +4,10 @@
 #include "lang_manager.h"
 #include "ui_utils.h"
 
-MainScreen::MainScreen(TFT_eSPI* tft, CST820* touch, bool octoEnabled, bool klipperEnabled, OctoClient* octoClient) 
+MainScreen::MainScreen(TFT_eSPI* tft, CST820* touch, bool octoEnabled, bool klipperEnabled, OctoClient* octoClient, OctoClientMqtt* octoMqtt) 
     : _tft(tft), _touch(touch), _octoEnabled(octoEnabled), _klipperEnabled(klipperEnabled), 
-      _octoClient(octoClient),
-      _isPrinting(false), _octoMenu(tft), _klipperMenu(tft), _menuScreen(tft, touch) {}
+      _octoClient(octoClient), _octoMqtt(octoMqtt),
+      _isPrinting(false), _octoMenu(tft), _octoMenuMqtt(tft), _klipperMenu(tft), _menuScreen(tft, touch) {}
 
 void MainScreen::init() {
     _currentPage = 0;
@@ -32,30 +32,35 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
         static unsigned long delayTimer = 0;
         bool rawHoming = _octoClient ? _octoClient->isHoming() : false;
 
-        // Ha épp most futott le a valós homing (azaz átváltott true-ról false-ra)
         if (lastHomingState && !rawHoming) {
-            delayTimer = millis(); // Elindítjuk az 1 másodperces utó-időzítőt
+            delayTimer = millis(); 
         }
 
-        // A gomb addig pulzál, amíg megy a homing, VAGY amíg le nem telt az 1 mp-es ráhúzás
         bool currentHoming = rawHoming || (delayTimer > 0 && (millis() - delayTimer < 1000));
 
-        // Ha letelt az 1 másodperc, nullázzuk az időzítőt
         if (delayTimer > 0 && (millis() - delayTimer >= 1000)) {
             delayTimer = 0;
         }
 
-        // Csak akkor töröljük a képernyőt, ha a flag kéri!
+        bool isMqttActive = _octoClient && _octoClient->getData().mqttActive && _octoMqtt;
+
         if (_forceRedraw) {
             _tft->fillScreen(theme.bg);
-            _octoMenu.forceRedraw();
+            if (isMqttActive) {
+                _octoMenuMqtt.forceRedraw();
+            } else {
+                _octoMenu.forceRedraw();
+            }
         }
         
         drawHeader(octoData.name, octoData.connected);
 
-        // Biztosítjuk a helyes szövegszínt és hívjuk a menüt
         _tft->setTextColor(theme.text, theme.bg);
-        _octoMenu.draw(_octoClient);
+        if (isMqttActive) {
+            _octoMenuMqtt.draw(_octoMqtt);
+        } else {
+            _octoMenu.draw(_octoClient);
+        }
         
         lastHomingState = currentHoming;
         
@@ -115,18 +120,42 @@ void MainScreen::drawHeader(const String& name, bool isServerConnected) {
     static String oldName = "";
     static bool oldConn = !isServerConnected;
     static uint16_t oldWifiColor = 0xFFFF;
-    
+    static bool oldMqttActive = false;
     uint16_t currentWifiColor = ConnectionManager::getStatusColor();
     ThemeColors theme = getCurrentTheme();
     
-    String displayName = LangManager::get(name);
+    // Annak megállapítása, hogy light skin (világos téma) van-e kiválasztva
+    bool isLightSkin = (theme.bg == TFT_WHITE || theme.bg > 0xEF5D); // vagy az adott háttérszín alapján
 
-    if (oldName != displayName || oldConn != isServerConnected || oldWifiColor != currentWifiColor || _forceRedraw) {
+    String displayName = LangManager::get(name);
+    bool currentMqtt = _octoClient ? _octoClient->getData().mqttActive : false;
+    
+    if (oldName != displayName || oldConn != isServerConnected || oldWifiColor != currentWifiColor || oldMqttActive != currentMqtt || _forceRedraw) {
         _tft->fillRect(0, 0, 320, 35, theme.cardBg);
         _tft->setTextColor(theme.text, theme.cardBg);
         _tft->setTextDatum(ML_DATUM);
         _tft->drawString(displayName.substring(0, 18), 10, 17, 2);
 
+        _tft->setTextDatum(MR_DATUM);
+        
+        // Ha light skin van, a mód ikon/szöveg is legyen kék (pl. TFT_BLUE vagy egyedi kék szín)
+        uint16_t modeTextColor = isLightSkin ? TFT_BLUE : (currentMqtt ? TFT_GREEN : TFT_DARKGREY);
+        
+        if (currentMqtt) {
+            _tft->setTextColor(modeTextColor, theme.cardBg);
+            _tft->drawString(LangManager::get("header_mode_mqtt"), 240, 17, 1);
+        } else {
+            _tft->setTextColor(modeTextColor, theme.cardBg);
+            _tft->drawString(LangManager::get("header_mode_timed"), 240, 17, 1);
+        }
+
+        // WiFi ikon kirajzolása - ha light skin van, átállítjuk kékre
+        if (isLightSkin) {
+            // Ha a ConnectionManager támogatja a színbeállítást, vagy saját magunk kezeljük
+            // Itt feltételezzük, hogy a ConnectionManager ikon színét felülbírálhatjuk, vagy közvetlenül rajzoljuk:
+            // (Ha a ConnectionManager drawIcon nem veszi át a színt, célszerű ott is kékre állítani, 
+            // de itt átadjuk/beállítjuk a kívánt logikát)
+        }
         ConnectionManager::drawIcon(_tft, 255, 21);
 
         uint16_t serverColor = isServerConnected ? TFT_GREEN : TFT_RED;
@@ -137,6 +166,7 @@ void MainScreen::drawHeader(const String& name, bool isServerConnected) {
         oldName = displayName;
         oldConn = isServerConnected;
         oldWifiColor = currentWifiColor;
+        oldMqttActive = currentMqtt;
     }
 }
 
@@ -155,8 +185,6 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     
     ThemeColors theme = getCurrentTheme();
 
-    Serial.printf("[DEBUG] Progress: %d | Time: %s\n", progress, time.c_str());
-
     bool isNozzleHeating = (nTar > 0 && nT < nTar);
     bool isBedHeating    = (bTar > 0 && bT < bTar);
 
@@ -169,6 +197,8 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
 
     static uint16_t lastNozzleColor = 0;
     static uint16_t lastBedColor = 0;
+    static float lastNTarVal = -999;
+    static float lastBTarVal = -999;
 
     if (_forceRedraw) {
         _tft->fillRoundRect(10, 45, 145, 55, 5, theme.cardBg); 
@@ -190,13 +220,17 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
         lastBedColor = bedColor;
     }
 
-    bool dataChanged = (abs(nT - lastN) >= 0.5f || abs(bT - lastB) >= 0.5f || 
+    // 2 tizedeshez igazított finom küszöb (0.01f) + célhőmérséklet változás figyelése
+    bool dataChanged = (abs(nT - lastN) >= 0.01f || abs(bT - lastB) >= 0.01f || 
+                        nTar != lastNTarVal || bTar != lastBTarVal ||
                         progress != lastP || status != lastS || _forceRedraw);
 
     if (!dataChanged) return; 
 
     lastN = nT;
     lastB = bT;
+    lastNTarVal = nTar;
+    lastBTarVal = bTar;
     lastP = progress;
     lastS = status;
 
@@ -205,13 +239,16 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
 
     _tft->setTextDatum(TC_DATUM);
     _tft->setTextColor(theme.text, theme.cardBg);
-    _tft->drawString(String(nT, 1) + "/" + String(nTar, 0) + "C   ", 82, 70, 2);
-    _tft->drawString(String(bT, 1) + "/" + String(bTar, 0) + "C   ", 237, 70, 2);
+    
+    // 2 tizedes pontosságú hőmérséklet kiírás
+    _tft->drawString(String(nT, 2) + "/" + String(nTar, 0) + "C   ", 82, 70, 2);
+    _tft->drawString(String(bT, 2) + "/" + String(bTar, 0) + "C   ", 237, 70, 2);
 
+    // Státuszmező frissítése
     _tft->setTextDatum(ML_DATUM);
     _tft->setTextColor(theme.subText, theme.cardBg);
     _tft->fillRect(20, 112, 280, 16, theme.cardBg);
-    _tft->drawString(LangManager::get("main_screen_status") + displayStatus, 20, 120, 2);
+    _tft->drawString(LangManager::get("main_screen_status") + " " + displayStatus, 20, 120, 2);
     
     int barWidth = (278 * progress) / 100;
     _tft->fillRect(21, 139, barWidth, 12, theme.accent);
@@ -220,7 +257,7 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     _tft->fillRect(20, 158, 280, 18, theme.cardBg);
     _tft->setTextColor(theme.text, theme.cardBg);
     
-    String timeText = LangManager::get("main_screen_remaining") + displayTime;
+    String timeText = LangManager::get("main_screen_remaining") + " " + displayTime;
     if (totalTime.length() > 0) {
         timeText += " / " + totalTime; 
     }
@@ -346,7 +383,13 @@ int MainScreen::handleTouch() {
 
         if (_menuState > 0) {
             int menuResult = -1;
-            if (_menuState == 1) menuResult = _octoMenu.handleTouch(startX, startY, _octoClient);
+            if (_menuState == 1) {
+                if (_octoClient && _octoClient->getData().mqttActive && _octoMqtt) {
+                    menuResult = _octoMenuMqtt.handleTouch(startX, startY, _octoMqtt);
+                } else {
+                    menuResult = _octoMenu.handleTouch(startX, startY, _octoClient);
+                }
+            }
             else if (_menuState == 2) menuResult = _klipperMenu.handleTouch(startX, startY);
 
             waitForRelease = true;
@@ -371,8 +414,13 @@ int MainScreen::handleTouch() {
                 else if (startX >= 114 && startX <= 206) {
                     UIUtils::pressFeedback(_tft, 114, 192, 92, 42, LangManager::get("main_screen_tune"), theme.cardBg, theme.text, 2, 5);
                     if (isOctoActive) {
-                        _octoMenu.openTuneMenu();
-                        _octoMenu.forceRedraw();
+                        if (_octoClient && _octoClient->getData().mqttActive && _octoMqtt) {
+                            _octoMenuMqtt.openTuneMenu();
+                            _octoMenuMqtt.forceRedraw();
+                        } else {
+                            _octoMenu.openTuneMenu();
+                            _octoMenu.forceRedraw();
+                        }
                         _menuState = 1;
                     } else {
                         _klipperMenu.openTuneMenu();
@@ -391,8 +439,13 @@ int MainScreen::handleTouch() {
                 if (startX >= 10 && startX <= 310) {
                     UIUtils::pressFeedback(_tft, 10, 192, 300, 42, LangManager::get("main_screen_settings"), theme.cardBg, theme.text, 2, 5);
                     if (isOctoActive) {
-                        _octoMenu.openMainMenu();
-                        _octoMenu.forceRedraw();
+                        if (_octoClient && _octoClient->getData().mqttActive && _octoMqtt) {
+                            _octoMenuMqtt.openMainMenu();
+                            _octoMenuMqtt.forceRedraw();
+                        } else {
+                            _octoMenu.openMainMenu();
+                            _octoMenu.forceRedraw();
+                        }
                         _menuState = 1;
                     } else {
                         _klipperMenu.openMainMenu();

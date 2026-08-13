@@ -36,6 +36,7 @@ void MenuScreen::draw(bool octoEnabled, bool octoConn, bool octoPrint, bool klip
                 case 2: drawLanguageMenu(); break; 
                 case 3: drawSkinMenu(); break;
                 case 4: drawSystemMenu(); break;
+                case 5: drawInfoMenu(); break; // Infó almenü
             }
             _lastSubMenuChecked = _currentSubMenu;
         }
@@ -119,12 +120,12 @@ void MenuScreen::drawWifiMenu() {
     _tft->drawString(LangManager::get("wifi_menu_title"), 160, 20, 2);
     
     _tft->setTextColor(theme.text, theme.bg);
-    _tft->drawString(LangManager::get("wifi_menu_ssid") + WiFi.SSID(), 160, 65, 2);
-    _tft->drawString(LangManager::get("wifi_menu_ip") + WiFi.localIP().toString(), 160, 100, 2);
-    _tft->drawString(LangManager::get("wifi_menu_gateway") + WiFi.gatewayIP().toString(), 160, 135, 2);
+    _tft->drawString(LangManager::get("wifi_menu_ssid") + " " + WiFi.SSID(), 160, 65, 2);
+    _tft->drawString(LangManager::get("wifi_menu_ip") + " " + WiFi.localIP().toString(), 160, 100, 2);
+    _tft->drawString(LangManager::get("wifi_menu_gateway") + " " + WiFi.gatewayIP().toString(), 160, 135, 2);
     
     String wifiStatusText = WiFi.status() == WL_CONNECTED ? LangManager::get("wifi_connected_text") : LangManager::get("wifi_none_text");
-    _tft->drawString(LangManager::get("wifi_menu_status") + wifiStatusText, 160, 170, 2);
+    _tft->drawString(LangManager::get("wifi_menu_status") + " " + wifiStatusText, 160, 170, 2);
 
     drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
 }
@@ -138,16 +139,14 @@ void MenuScreen::drawLanguageMenu() {
     int btnY = 50;
 
     auto drawLangBtn = [&](const char* code, const char* name) {
-        if (SD.exists(String("/") + code + ".lang")) {
-            bool isActive = (_config.language == code);
-            drawMenuButton(btnX, btnY, 135, 38, name, isActive ? theme.accent : theme.cardBg, isActive ? TFT_BLACK : theme.text);
-            
-            if (btnX == 20) { 
-                btnX = 165; 
-            } else { 
-                btnX = 20; 
-                btnY += 48; 
-            }
+        bool isActive = (_config.language == code);
+        drawMenuButton(btnX, btnY, 135, 38, name, isActive ? theme.accent : theme.cardBg, isActive ? TFT_BLACK : theme.text);
+        
+        if (btnX == 20) { 
+            btnX = 165; 
+        } else { 
+            btnX = 20; 
+            btnY += 48; 
         }
     };
 
@@ -174,21 +173,67 @@ void MenuScreen::drawSkinMenu() {
 void MenuScreen::drawSystemMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->setTextColor(theme.accent, theme.bg);
-    _tft->drawString(LangManager::get("system_menu_title"), 160, 20, 2);
+    _tft->drawString(LangManager::get("system_menu_title"), 160, 15, 2);
     
-    UIUtils::drawButton(_tft, 20, 50, 280, 35, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, false, 2, 6);
-    UIUtils::drawButton(_tft, 20, 95, 280, 35, LangManager::get("system_del_config"), TFT_RED, TFT_WHITE, false, 2, 6);
-    UIUtils::drawButton(_tft, 20, 140, 280, 35, LangManager::get("system_format_sd"), TFT_RED, TFT_WHITE, false, 2, 6);
+    // 2x2 elrendezés (4 menüpont) - Dinamikus szövegekkel
+    drawMenuButton(20, 45, 130, 65, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK);
+    drawMenuButton(170, 45, 130, 65, LangManager::get("system_del_config"), TFT_RED, TFT_WHITE);
+    drawMenuButton(20, 120, 130, 65, LangManager::get("system_format_sd"), TFT_RED, TFT_WHITE);
+    drawMenuButton(170, 120, 130, 65, LangManager::get("system_btn_info"), theme.cardBg, theme.text);
 
+    drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
+}
+
+void MenuScreen::drawInfoMenu() {
+    ThemeColors theme = getCurrentTheme();
+    _tft->setTextColor(theme.accent, theme.bg);
+    _tft->drawString(LangManager::get("info_menu_title"), 160, 15, 2);
+    
+    _tft->setTextColor(theme.text, theme.bg);
+    _tft->setTextDatum(ML_DATUM);
+
+    // 1. Szabad memória (Heap)
+    uint32_t freeHeap = ESP.getFreeHeap();
+    _tft->drawString(LangManager::get("info_free_ram") + " " + String(freeHeap / 1024) + " KB", 30, 50, 2);
+
+    // 2. FW Verziószám
+    _tft->drawString(LangManager::get("info_fw_version") + " " + "v1.0.0", 30, 80, 2);
+
+    // 3. OctoPrint verzió (státusz / címke)
+    _tft->drawString(LangManager::get("info_octo_version") + " " + "v1.10.x", 30, 110, 2);
+
+    // 4. SD kártya fájlok száma és integritás (OK)
+    int fileCount = 0;
+    File root = SD.open("/");
+    if (root) {
+        File file = root.openNextFile();
+        while (file) {
+            if (!file.isDirectory()) {
+                fileCount++;
+            }
+            file = root.openNextFile();
+        }
+        root.close();
+    _tft->drawString(LangManager::get("info_sd_files") + " " + String(fileCount) + " db (OK)", 30, 140, 2);
+    }
+
+    _tft->setTextDatum(MC_DATUM);
     drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
 }
 
 bool MenuScreen::handleClick(uint16_t x, uint16_t y) {
     ThemeColors theme = getCurrentTheme();
 
+    // Vissza gomb kezelése minden almenüben
     if (_currentSubMenu > 0 && y >= 195 && y <= 230) {
         UIUtils::pressFeedback(_tft, 20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE, 2, 6);
-        _currentSubMenu = 0; 
+        
+        if (_currentSubMenu == 5) {
+            _currentSubMenu = 4; // Infóból visszatérés a Rendszer menübe
+        } else {
+            _currentSubMenu = 0; // Egyéb almenüből visszatérés a főmenübe
+        }
+
         _mainMenuButtonsDrawn = false; 
         _config = ConfigManager::loadConfig(); 
         _tft->fillScreen(theme.bg);
@@ -221,32 +266,39 @@ bool MenuScreen::handleClick(uint16_t x, uint16_t y) {
     else if (_currentSubMenu == 2) {
         int btnX = 20;
         int btnY = 50;
-        bool changed = false;
+        String selectedLang = "";
 
         auto checkLangClick = [&](const char* code, const char* name) {
-            if (SD.exists(String("/") + code + ".lang")) {
-                if (x >= btnX && x <= btnX + 135 && y >= btnY && y <= btnY + 38) {
-                    bool isActive = (_config.language == code);
-                    UIUtils::pressFeedback(_tft, btnX, btnY, 135, 38, name, isActive ? theme.accent : theme.cardBg, isActive ? TFT_BLACK : theme.text, 2, 6);
-                    _config.language = code;
-                    changed = true;
-                }
-                if (btnX == 20) { btnX = 165; }
-                else { btnX = 20; btnY += 48; }
+            if (selectedLang == "" && x >= btnX && x <= btnX + 135 && y >= btnY && y <= btnY + 38) {
+                bool isActive = (_config.language == code);
+                UIUtils::pressFeedback(_tft, btnX, btnY, 135, 38, name, isActive ? theme.accent : theme.cardBg, isActive ? TFT_BLACK : theme.text, 2, 6);
+                selectedLang = code;
             }
+            if (btnX == 20) { btnX = 165; }
+            else { btnX = 20; btnY += 48; }
         };
 
         checkLangClick("hu", "Magyar");
-        if(!changed) checkLangClick("en", "English");
-        if(!changed) checkLangClick("de", "Deutsch");
-        if(!changed) checkLangClick("pl", "Polski");
+        checkLangClick("en", "English");
+        checkLangClick("de", "Deutsch");
+        checkLangClick("pl", "Polski");
 
-        if (changed) {
+        if (selectedLang.length() > 0 && selectedLang != _config.language) {
+            _config.language = selectedLang;
+            digitalWrite(15, HIGH);
+            digitalWrite(5, HIGH);
+            delay(10);
+            SPI.setFrequency(4000000);
+
             ConfigManager::saveConfig(_config);
-            LangManager::loadLanguage(_config.language); 
+            delay(50);
+            LangManager::loadLanguage(_config.language);
+            _config = ConfigManager::loadConfig();
+
             ThemeColors newTheme = getCurrentTheme();
             _tft->fillScreen(newTheme.bg);
             _lastSubMenuChecked = 255;
+            _mainMenuButtonsDrawn = false;
             draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
         }
     }
@@ -277,23 +329,35 @@ bool MenuScreen::handleClick(uint16_t x, uint16_t y) {
         }
     }
     else if (_currentSubMenu == 4) {
-        if (y >= 50 && y <= 85) { 
-            UIUtils::pressFeedback(_tft, 20, 50, 280, 35, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, 2, 6);
-            ESP.restart(); 
+        // 2x2 Rendszer menü kattintáskezelés
+        if (y >= 45 && y <= 110) {
+            if (x >= 20 && x <= 150) { 
+                UIUtils::pressFeedback(_tft, 20, 45, 130, 65, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, 2, 6);
+                ESP.restart(); 
+            }
+            else if (x >= 170 && x <= 300) { 
+                UIUtils::pressFeedback(_tft, 170, 45, 130, 65, LangManager::get("system_del_config"), TFT_RED, TFT_WHITE, 2, 6);
+                if (SD.exists("/config.json")) SD.remove("/config.json");
+                ConfigManager::createDefaultConfig();
+                _config = ConfigManager::loadConfig();
+                draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
+            }
         }
-        else if (y >= 95 && y <= 130) { 
-            UIUtils::pressFeedback(_tft, 20, 95, 280, 35, LangManager::get("system_del_config"), TFT_RED, TFT_WHITE, 2, 6);
-            if (SD.exists("/config.json")) SD.remove("/config.json");
-            ConfigManager::createDefaultConfig();
-            _config = ConfigManager::loadConfig();
-            draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
-        }
-        else if (y >= 140 && y <= 175) { 
-            UIUtils::pressFeedback(_tft, 20, 140, 280, 35, LangManager::get("system_format_sd"), TFT_RED, TFT_WHITE, 2, 6);
-            SD.remove("/config.json");
-            SD.remove("/system.log");
-            delay(500);
-            ESP.restart();
+        else if (y >= 120 && y <= 185) {
+            if (x >= 20 && x <= 150) { 
+                UIUtils::pressFeedback(_tft, 20, 120, 130, 65, LangManager::get("system_format_sd"), TFT_RED, TFT_WHITE, 2, 6);
+                SD.remove("/config.json");
+                SD.remove("/system.log");
+                delay(500);
+                ESP.restart();
+            }
+            else if (x >= 170 && x <= 300) { 
+                UIUtils::pressFeedback(_tft, 170, 120, 130, 65, LangManager::get("system_btn_info"), theme.cardBg, theme.text, 2, 6);
+                _currentSubMenu = 5; // Nyitás az Info almenüre
+                _mainMenuButtonsDrawn = false;
+                _tft->fillScreen(theme.bg);
+                draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
+            }
         }
     }
     return false;

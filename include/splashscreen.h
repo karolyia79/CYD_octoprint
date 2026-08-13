@@ -14,7 +14,7 @@ public:
     void showMessage(const String& msg, uint16_t color = TFT_WHITE);
     void drawProgressBar(int progress);
     void showAPInfo(const String& ssid, const String& pass, const String& ip, bool clientConnected, const String& wifiError = "");
-    void showConnectedInfo(const String& localIp, bool octoActive, bool klipperActive, bool pluginMissing = false);
+    void showConnectedInfo(const String& localIp, bool octoActive, bool klipperActive, bool pluginMissing = false, bool mqttConnected = true);
     bool getTouch(uint16_t *x, uint16_t *y);
     bool hasError() const { return _hasError; }
 

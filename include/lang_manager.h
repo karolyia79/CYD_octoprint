@@ -3,27 +3,78 @@
 
 #include <Arduino.h>
 #include <SD.h>
+#include <SPI.h>
 #include <map>
-#include <vector>
+
+#define SD_CS_PIN 5
+#define TFT_CS_PIN 15
 
 class LangManager {
 private:
     static std::map<String, String> _dictionary;
     static String _currentLang;
 
+    // Hardveres SPI busz feloldása és SD kártyára állítása
+    static void releaseAndPrepareSPI() {
+        // 1. TFT CS hatástalanítása
+        pinMode(TFT_CS_PIN, OUTPUT);
+        digitalWrite(TFT_CS_PIN, HIGH);
+
+        // 2. SD CS felengedése
+        pinMode(SD_CS_PIN, OUTPUT);
+        digitalWrite(SD_CS_PIN, HIGH);
+
+        // 3. KRITIKUS: A TFT_eSPI által nyitva hagyott SPI tranzakció hardveres lezárása!
+        SPI.endTransaction();
+
+        // 4. Órajel visszaállítása az SD kártya stabil 4 MHz-es sebességére
+        SPI.setFrequency(4000000);
+        delay(5);
+    }
+
 public:
     static bool loadLanguage(const String& langCode) {
-        String path = "/" + langCode + ".lang";
-        if (!SD.exists(path)) {
-            path = "/en.lang"; // Fallback angolra
-            if (!SD.exists(path)) return false;
+        releaseAndPrepareSPI();
+
+        String code = langCode;
+        code.trim();
+        code.toLowerCase();
+        if (code.length() == 0) code = "hu";
+
+        Serial.printf("\n[LANG DIAG] ===> loadLanguage('%s') hívva\n", code.c_str());
+
+        String path = "/" + code + ".lang";
+        bool found = SD.exists(path);
+
+        if (!found) {
+            releaseAndPrepareSPI();
+            path = "/" + code + ".LANG";
+            found = SD.exists(path);
         }
 
+        if (!found) {
+            releaseAndPrepareSPI();
+            String upperCode = code;
+            upperCode.toUpperCase();
+            path = "/" + upperCode + ".LANG";
+            found = SD.exists(path);
+        }
+
+        if (!found) {
+            Serial.printf("[LANG DIAG CRITICAL] HIBA: A(z) '%s' nyelvi fájl nem olvasható az SD kártyáról!\n", code.c_str());
+            return false;
+        }
+
+        releaseAndPrepareSPI();
         File file = SD.open(path, FILE_READ);
-        if (!file) return false;
+        if (!file) {
+            Serial.printf("[LANG DIAG ERROR] SD.open(%s) meghiúsult!\n", path.c_str());
+            return false;
+        }
 
         _dictionary.clear();
-        _currentLang = langCode;
+        _currentLang = code;
+        int loadedKeys = 0;
 
         while (file.available()) {
             String line = file.readStringUntil('\n');
@@ -38,10 +89,16 @@ public:
                 key.trim();
                 value.trim();
                 _dictionary[key] = value;
+                loadedKeys++;
             }
         }
         file.close();
-        Serial.printf("[LANG] Betoltott nyelv: %s (%d kulcs)\n", langCode.c_str(), _dictionary.size());
+
+        // Művelet végén lezárjuk az SD tranzakciót is
+        digitalWrite(SD_CS_PIN, HIGH);
+        SPI.endTransaction();
+
+        Serial.printf("[LANG DIAG SIKER] %d kulcs sikeresen beolvasva a memóriába (%s)!\n\n", loadedKeys, path.c_str());
         return true;
     }
 
@@ -49,36 +106,12 @@ public:
         if (_dictionary.find(key) != _dictionary.end()) {
             return _dictionary[key];
         }
-        return key; // Ha hiányzik a kulcs, magát a kulcsot adja vissza
+        return key;
     }
 
-    static String getCurrentLang() {
-        return _currentLang;
-    }
-
-    static std::vector<String> getAvailableLanguages() {
-        std::vector<String> languages;
-        File root = SD.open("/");
-        if (!root || !root.isDirectory()) return languages;
-
-        File file = root.openNextFile();
-        while (file) {
-            if (!file.isDirectory()) {
-                String fileName = String(file.name());
-                if (fileName.endsWith(".lang")) {
-                    int dotIndex = fileName.lastIndexOf('.');
-                    int slashIndex = fileName.lastIndexOf('/');
-                    String langCode = fileName.substring(slashIndex + 1, dotIndex);
-                    languages.push_back(langCode);
-                }
-            }
-            file = root.openNextFile();
-        }
-        return languages;
-    }
+    static String getCurrentLang() { return _currentLang; }
 };
 
-// Statikus tagok definíciója
 inline std::map<String, String> LangManager::_dictionary;
 inline String LangManager::_currentLang = "hu";
 

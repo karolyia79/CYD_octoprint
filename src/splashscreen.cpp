@@ -66,31 +66,54 @@ void SplashScreen::showAPInfo(const String& ssid, const String& pass, const Stri
     }
 }
 
-void SplashScreen::showConnectedInfo(const String& localIp, bool octoActive, bool klipperActive, bool pluginMissing) {
+void SplashScreen::showConnectedInfo(const String& localIp, bool octoActive, bool klipperActive, bool pluginMissing, bool mqttConnected) {
     _tft->fillScreen(TFT_BLACK);
-    _hasError = pluginMissing; 
 
-    if (_hasError) {
+    if (pluginMissing) {
         // --- HIBA: HIÁNYZÓ OCTOPRINT PLUGIN ---
+        _hasError = true;
         _tft->setTextColor(TFT_RED, TFT_BLACK);
         _tft->setTextDatum(MC_DATUM);
-        _tft->drawString("HIBA: HIANYZO PLUGIN!", 160, 20, 2);
+        _tft->drawString(LangManager::get("splash_err_plugin_title"), 160, 20, 2);
 
         _tft->setTextColor(TFT_WHITE, TFT_BLACK);
         _tft->setTextDatum(ML_DATUM);
-        _tft->drawString("OctoKlipscreenBridge szukseges!", 20, 60, 1);
+        _tft->drawString(LangManager::get("splash_err_plugin_req"), 20, 60, 1);
         
         _tft->setTextColor(TFT_YELLOW, TFT_BLACK);
-        _tft->drawString("Telepitsd innen:", 20, 95, 1);
+        _tft->drawString(LangManager::get("splash_err_install_from"), 20, 95, 1);
         _tft->setTextColor(TFT_CYAN, TFT_BLACK);
-        _tft->drawString("github.com/karolyia79/", 20, 115, 1);
-        _tft->drawString("OctoklipscreenBridge", 20, 132, 1);
+        _tft->drawString(LangManager::get("splash_err_plugin_url1"), 20, 115, 1);
+        _tft->drawString(LangManager::get("splash_err_plugin_url2"), 20, 132, 1);
 
         _tft->setTextColor(TFT_GREEN, TFT_BLACK);
         _tft->setTextDatum(MC_DATUM);
-        _tft->drawString("Erints meg a kepernyot a folytatashoz", 160, 195, 1);
-    } else {
+        _tft->drawString(LangManager::get("splash_touch_to_continue"), 160, 195, 1);
+    } 
+    else if (!mqttConnected) {
+        // --- HIBA: NEM ÉRHETŐ EL AZ MQTT BROKER (Feltételes ellenőrzés plugin megléte esetén) ---
+        _hasError = true;
+        _tft->setTextColor(TFT_RED, TFT_BLACK);
+        _tft->setTextDatum(MC_DATUM);
+        _tft->drawString(LangManager::get("splash_err_mqtt_title"), 160, 20, 2);
+
+        _tft->setTextColor(TFT_WHITE, TFT_BLACK);
+        _tft->setTextDatum(ML_DATUM);
+        _tft->drawString(LangManager::get("splash_err_mqtt_no_resp"), 20, 65, 1);
+        
+        _tft->setTextColor(TFT_YELLOW, TFT_BLACK);
+        _tft->drawString(LangManager::get("splash_err_todo"), 20, 105, 1);
+        _tft->setTextColor(TFT_CYAN, TFT_BLACK);
+        _tft->drawString(LangManager::get("splash_err_mqtt_todo1"), 20, 130, 1);
+        _tft->drawString(LangManager::get("splash_err_mqtt_todo2"), 20, 150, 1);
+
+        _tft->setTextColor(TFT_GREEN, TFT_BLACK);
+        _tft->setTextDatum(MC_DATUM);
+        _tft->drawString(LangManager::get("splash_touch_to_continue"), 160, 195, 1);
+    } 
+    else {
         // --- NORMÁL CSATLAKOZOTT NÉZET ---
+        _hasError = false;
         _tft->setTextColor(TFT_GREEN, TFT_BLACK);
         _tft->setTextDatum(MC_DATUM);
         _tft->drawString(LangManager::get("splash_connected_title"), 160, 20, 2);
