@@ -4,9 +4,10 @@
 #include "config_manager.h"
 #include <math.h>
 
-OctoMenuMqtt::OctoMenuMqtt(TFT_eSPI* tft) : _tft(tft), _bedLevelMenu(tft), _otherCalibMenu(tft) {
+OctoMenuMqtt::OctoMenuMqtt(TFT_eSPI* tft) : _tft(tft), _bedLevelMenu(tft), _otherCalibMenu(tft), _controlMenu(tft) {
     _bedLevelMenu.init();
     _otherCalibMenu.init();
+    _controlMenu.init();
 }
 
 void OctoMenuMqtt::draw(OctoClientMqtt* client) {
@@ -69,7 +70,7 @@ void OctoMenuMqtt::draw(OctoClientMqtt* client) {
             break;
 
         case SUB_CONTROL:   
-            if (subStateChanged) drawControlMenu(); 
+            _controlMenu.draw(client);
             break;
         case SUB_CALIBRATION: 
             if (subStateChanged) drawCalibrationMenu(); 
@@ -278,20 +279,6 @@ void OctoMenuMqtt::drawCalibrationMenu() {
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenuMqtt::drawControlMenu() {
-    ThemeColors theme = getCurrentTheme();
-    _tft->fillRect(10, 45, 300, 190, theme.bg);
-    _tft->setTextColor(theme.accent, theme.bg);
-    _tft->setTextDatum(TC_DATUM);
-    _tft->drawString(LangManager::get("octo_menu_control_title"), 160, 48, 2);
-    
-    _tft->setTextColor(theme.subText, theme.bg);
-    _tft->setTextDatum(MC_DATUM);
-    _tft->drawString(LangManager::get("octo_coming_soon"), 160, 120, 2);
-
-    UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
-}
-
 void OctoMenuMqtt::drawFilamentMenu() {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
@@ -488,7 +475,7 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
             } else if (x >= 170 && x <= 300) {
                 UIUtils::pressFeedback(_tft, 170, 75, 130, 55, LangManager::get("octo_btn_control"), theme.cardBg, theme.text, 2, 5);
                 _subState = SUB_CONTROL;
-                drawControlMenu();
+                _controlMenu.open();
                 return 1;
             }
         } else if (y >= 138 && y <= 193) {
@@ -538,7 +525,6 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
             return 1;
         }
 
-        // ÚJ Cooldown gomb érintéskezelése (Nozzle és Bed célhőmérséklet -> 0)
         if (y >= 160 && y <= 195) {
             if (client) {
                 UIUtils::pressFeedback(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, 2, 5);
@@ -587,7 +573,17 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
         return -1;
     }
 
-    if (_subState == SUB_CONTROL || _subState == SUB_FILAMENT) {
+    if (_subState == SUB_CONTROL) {
+        int result = _controlMenu.handleTouch(x, y, client);
+        if (result == 0) {
+            _subState = SUB_MAIN;
+            drawMainMenu();
+            return 1;
+        }
+        return result;
+    }
+
+    if (_subState == SUB_FILAMENT) {
         if (y >= 200) { 
             UIUtils::pressFeedback(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
             _subState = SUB_MAIN; 

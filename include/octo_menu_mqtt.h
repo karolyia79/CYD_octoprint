@@ -6,6 +6,7 @@
 #include "octo_client_mqtt.h"
 #include "octo_bedlevel_menu_mqtt.h"
 #include "octo_other_calibration_mqtt.h"
+#include "octo_control_menu_mqtt.h"
 
 class OctoMenuMqtt {
 public:
@@ -22,6 +23,7 @@ private:
     TFT_eSPI* _tft;
     OctoBedLevelMenuMqtt _bedLevelMenu;
     OctoOtherCalibrationMenuMqtt _otherCalibMenu;
+    OctoControlMenuMqtt _controlMenu;
 
     enum SubState {
         SUB_MAIN, SUB_PREPARE, SUB_CONTROL, SUB_CALIBRATION,
@@ -41,7 +43,6 @@ private:
     void drawMainMenu();
     void drawPrepareMenu(OctoClientMqtt* client = nullptr);
     void drawCalibrationMenu();
-    void drawControlMenu();
     void drawFilamentMenu();
     void drawTuneMenu(OctoClientMqtt* client);
     void drawZOffsetMenu();

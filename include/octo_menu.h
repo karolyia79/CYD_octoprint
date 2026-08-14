@@ -5,6 +5,7 @@
 #include "octo_client.h"
 #include "octo_bedlevel_menu.h"
 #include "octo_other_calibration.h"
+#include "octo_control_menu.h"
 
 class OctoMenu {
 public:
@@ -40,6 +41,7 @@ private:
     
     OctoBedLevelMenu _bedLevelMenu;
     OctoOtherCalibrationMenu _otherCalibMenu;
+    OctoControlMenu _controlMenu;
     
     bool _showUnsupportedPopup = false;
     uint32_t _unsupportedPopupStartMs = 0;
@@ -53,7 +55,6 @@ private:
 
     void drawMainMenu();
     void drawPrepareMenu();
-    void drawControlMenu();
     void drawCalibrationMenu();
     void drawFilamentMenu();
 

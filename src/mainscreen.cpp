@@ -125,7 +125,7 @@ void MainScreen::drawHeader(const String& name, bool isServerConnected) {
     ThemeColors theme = getCurrentTheme();
     
     // Annak megállapítása, hogy light skin (világos téma) van-e kiválasztva
-    bool isLightSkin = (theme.bg == TFT_WHITE || theme.bg > 0xEF5D); // vagy az adott háttérszín alapján
+    bool isLightSkin = (theme.bg == TFT_WHITE || theme.bg > 0xEF5D);
 
     String displayName = LangManager::get(name);
     bool currentMqtt = _octoClient ? _octoClient->getData().mqttActive : false;
@@ -138,7 +138,7 @@ void MainScreen::drawHeader(const String& name, bool isServerConnected) {
 
         _tft->setTextDatum(MR_DATUM);
         
-        // Ha light skin van, a mód ikon/szöveg is legyen kék (pl. TFT_BLUE vagy egyedi kék szín)
+        // Ha light skin van, a mód ikon/szöveg is legyen kék
         uint16_t modeTextColor = isLightSkin ? TFT_BLUE : (currentMqtt ? TFT_GREEN : TFT_DARKGREY);
         
         if (currentMqtt) {
@@ -149,13 +149,6 @@ void MainScreen::drawHeader(const String& name, bool isServerConnected) {
             _tft->drawString(LangManager::get("header_mode_timed"), 240, 17, 1);
         }
 
-        // WiFi ikon kirajzolása - ha light skin van, átállítjuk kékre
-        if (isLightSkin) {
-            // Ha a ConnectionManager támogatja a színbeállítást, vagy saját magunk kezeljük
-            // Itt feltételezzük, hogy a ConnectionManager ikon színét felülbírálhatjuk, vagy közvetlenül rajzoljuk:
-            // (Ha a ConnectionManager drawIcon nem veszi át a színt, célszerű ott is kékre állítani, 
-            // de itt átadjuk/beállítjuk a kívánt logikát)
-        }
         ConnectionManager::drawIcon(_tft, 255, 21);
 
         uint16_t serverColor = isServerConnected ? TFT_GREEN : TFT_RED;
@@ -235,7 +228,11 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     lastS = status;
 
     String displayStatus = LangManager::get(status);
-    String displayTime = LangManager::get(time);
+    
+    // --- Kalibrációs státuszok direkt megjelenítése ---
+    if (status == "PID Autotune running") displayStatus = "PID Autotune running";
+    if (status == "MPC Autotune running") displayStatus = "MPC Autotune running";
+    // --------------------------------------------------
 
     _tft->setTextDatum(TC_DATUM);
     _tft->setTextColor(theme.text, theme.cardBg);
@@ -257,6 +254,7 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     _tft->fillRect(20, 158, 280, 18, theme.cardBg);
     _tft->setTextColor(theme.text, theme.cardBg);
     
+    String displayTime = LangManager::get(time);
     String timeText = LangManager::get("main_screen_remaining") + " " + displayTime;
     if (totalTime.length() > 0) {
         timeText += " / " + totalTime; 

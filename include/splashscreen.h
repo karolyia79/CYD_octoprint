@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include <SD.h>
 #include "CST820.h"
+#include "octo_client_mqtt.h"
 
 class SplashScreen {
 public:
@@ -15,6 +16,8 @@ public:
     void drawProgressBar(int progress);
     void showAPInfo(const String& ssid, const String& pass, const String& ip, bool clientConnected, const String& wifiError = "");
     void showConnectedInfo(const String& localIp, bool octoActive, bool klipperActive, bool pluginMissing = false, bool mqttConnected = true);
+    void showCalibrationCrashWarning();
+    void handleCrashRecovery(OctoClientMqtt* mqttClient, CST820* globalTouch);
     bool getTouch(uint16_t *x, uint16_t *y);
     bool hasError() const { return _hasError; }
 

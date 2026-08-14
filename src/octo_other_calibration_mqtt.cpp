@@ -15,9 +15,28 @@ void OctoOtherCalibrationMenuMqtt::init() {
     _targetTemp = 200;
     _pidCommandSent = false;
     _mpcCommandSent = false;
+    _checkedRunningState = false;
 }
 
 void OctoOtherCalibrationMenuMqtt::draw(OctoClientMqtt* client) {
+    // Egyszeri automatikus átváltás megnyitáskor, ha a háttérben fut kalibráció (villogásmentesen)
+    if (client && !_checkedRunningState) {
+        _checkedRunningState = true;
+        if (_subState == 0) {
+            if (client->isPidRunning()) {
+                _subState = 2;
+                _pidSubState = 1;
+                _pidCommandSent = true;
+                _forceRedraw = true;
+            } else if (client->isMpcRunning()) {
+                _subState = 3;
+                _mpcSubState = 1;
+                _mpcCommandSent = true;
+                _forceRedraw = true;
+            }
+        }
+    }
+
     if (_showPopup) {
         if (_forceRedraw) {
             drawPopup();
@@ -28,28 +47,32 @@ void OctoOtherCalibrationMenuMqtt::draw(OctoClientMqtt* client) {
 
     if (_subState == 0 && _forceRedraw) {
         drawMainMenu();
+        _forceRedraw = false;
     } else if (_subState == 1) {
         if (_estepSubState == 0 && _forceRedraw) {
             drawEStepMaterialMenu();
+            _forceRedraw = false;
         } else if (_estepSubState == 1) {
             drawEStepHeatingMenu(client);
         } else if (_estepSubState == 2 && _forceRedraw) {
             drawEStepMeasureMenu();
+            _forceRedraw = false;
         }
     } else if (_subState == 2) {
         if (_pidSubState == 0 && _forceRedraw) {
             drawPidMenu();
+            _forceRedraw = false;
         } else if (_pidSubState == 1) {
             drawPidRunningMenu(client);
         }
     } else if (_subState == 3) {
         if (_mpcSubState == 0 && _forceRedraw) {
             drawMpcMenu();
+            _forceRedraw = false;
         } else if (_mpcSubState == 1) {
             drawMpcRunningMenu(client);
         }
     }
-    _forceRedraw = false;
 }
 
 void OctoOtherCalibrationMenuMqtt::drawMainMenu() {
@@ -157,11 +180,43 @@ void OctoOtherCalibrationMenuMqtt::drawPidMenu() {
 
 void OctoOtherCalibrationMenuMqtt::drawPidRunningMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
-    static float lastTemp = -999.0f;
-    static bool lastPidDone = false;
+    static String lastTempStr = "";
 
     float currentTemp = client ? client->getData().nozzleTemp : 0.0f;
-    bool pidDone = false; 
+    String currentTempStr = String(currentTemp, 1);
+
+    if (client && client->hasUnknownCommandError()) {
+        Serial.println("[PID CALIB] Ismeretlen parancs észlelve, a firmware nem támogatja a megadott PID parancsot!");
+        client->clearUnknownCommandError();
+        client->stopCalibration();
+
+        _popupTitle = LangManager::get("calib_popup_err_unsupported");
+        _popupMsg1 = LangManager::get("calib_popup_mpc_no_fw1");
+        _popupMsg2 = LangManager::get("calib_popup_mpc_no_fw2");
+        _popupColor = TFT_RED;
+        _showPopup = true;
+        _pidCommandSent = false;
+        _pidSubState = 0;
+        _checkedRunningState = false;
+        _forceRedraw = true;
+        return;
+    }
+
+    if (client && client->isPidDone()) {
+        Serial.println("[PID CALIB] PID Autotune sikeresen befejezve!");
+        client->clearPidDone();
+
+        _popupTitle = "PID Autotune";
+        _popupMsg1 = "Tuning finished!";
+        _popupMsg2 = "Saved to EEPROM";
+        _popupColor = TFT_GREEN;
+        _showPopup = true;
+        _pidCommandSent = false;
+        _pidSubState = 0;
+        _checkedRunningState = false;
+        _forceRedraw = true;
+        return;
+    }
 
     if (_forceRedraw) {
         _tft->fillRect(10, 45, 300, 190, theme.bg);
@@ -173,28 +228,28 @@ void OctoOtherCalibrationMenuMqtt::drawPidRunningMenu(OctoClientMqtt* client) {
         _tft->setTextDatum(MC_DATUM);
         _tft->drawString(LangManager::get("calib_exit_save_disabled"), 160, 145, 1);
         
-        lastTemp = -999.0f;
-        lastPidDone = !pidDone;
+        UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
+
+        lastTempStr = "";
+        
+        _tft->fillRect(20, 75, 280, 65, theme.bg);
+        _tft->setTextDatum(MC_DATUM);
+        _tft->setTextColor(TFT_ORANGE, theme.bg);
+        _tft->drawString(LangManager::get("calib_waiting_cycles"), 160, 120, 1);
+        
+        _forceRedraw = false; // <--- EZ HIÁNYZOTT! Ezt kell beilleszteni.
     }
 
-    if (abs(currentTemp - lastTemp) >= 0.2f || pidDone != lastPidDone) {
-        lastTemp = currentTemp;
-        lastPidDone = pidDone;
+    if (currentTempStr != lastTempStr) {
+        lastTempStr = currentTempStr;
 
-        _tft->fillRect(20, 75, 280, 65, theme.bg);
+        _tft->setTextDatum(MC_DATUM);
+        _tft->setTextPadding(280); 
 
         _tft->setTextColor(theme.text, theme.bg);
-        _tft->setTextDatum(MC_DATUM);
-        _tft->drawString(LangManager::get("calib_current_hotend") + String(currentTemp, 1) + " C", 160, 90, 2);
-
-        if (pidDone) {
-            _tft->setTextColor(TFT_GREEN, theme.bg);
-            _tft->drawString(LangManager::get("calib_pid_done"), 160, 120, 2);
-            UIUtils::drawButton(_tft, 20, 155, 280, 38, LangManager::get("calib_btn_save_eeprom"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
-        } else {
-            _tft->setTextColor(TFT_ORANGE, theme.bg);
-            _tft->drawString(LangManager::get("calib_waiting_cycles"), 160, 120, 1);
-        }
+        _tft->drawString(LangManager::get("calib_current_hotend") + currentTempStr + " C", 160, 90, 2);
+        
+        _tft->setTextPadding(0);
     }
 }
 
@@ -217,11 +272,27 @@ void OctoOtherCalibrationMenuMqtt::drawMpcMenu() {
 
 void OctoOtherCalibrationMenuMqtt::drawMpcRunningMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
-    static float lastTemp = -999.0f;
-    static bool lastMpcDone = false;
+    static String lastTempStr = "";
 
     float currentTemp = client ? client->getData().nozzleTemp : 0.0f;
-    bool mpcDone = false;
+    String currentTempStr = String(currentTemp, 1);
+
+    if (client && client->hasUnknownCommandError()) {
+        Serial.println("[MPC CALIB] Ismeretlen parancs észlelve, a firmware nem támogatja az MPC-t!");
+        client->clearUnknownCommandError();
+        client->stopCalibration();
+
+        _popupTitle = LangManager::get("calib_popup_err_unsupported");
+        _popupMsg1 = LangManager::get("calib_popup_mpc_no_fw1");
+        _popupMsg2 = LangManager::get("calib_popup_mpc_no_fw2");
+        _popupColor = TFT_RED;
+        _showPopup = true;
+        _mpcCommandSent = false;
+        _mpcSubState = 0;
+        _checkedRunningState = false;
+        _forceRedraw = true;
+        return;
+    }
 
     if (_forceRedraw) {
         _tft->fillRect(10, 45, 300, 190, theme.bg);
@@ -233,28 +304,28 @@ void OctoOtherCalibrationMenuMqtt::drawMpcRunningMenu(OctoClientMqtt* client) {
         _tft->setTextDatum(MC_DATUM);
         _tft->drawString(LangManager::get("calib_exit_save_disabled"), 160, 145, 1);
         
-        lastTemp = -999.0f;
-        lastMpcDone = !mpcDone;
+        UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
+
+        lastTempStr = "";
+        
+        _tft->fillRect(20, 75, 280, 65, theme.bg);
+        _tft->setTextDatum(MC_DATUM);
+        _tft->setTextColor(TFT_ORANGE, theme.bg);
+        _tft->drawString(LangManager::get("calib_waiting_cycles"), 160, 120, 1);
+        
+        _forceRedraw = false; // <--- Itt is be kellett tenni!
     }
 
-    if (abs(currentTemp - lastTemp) >= 0.2f || mpcDone != lastMpcDone) {
-        lastTemp = currentTemp;
-        lastMpcDone = mpcDone;
+    if (currentTempStr != lastTempStr) {
+        lastTempStr = currentTempStr;
 
-        _tft->fillRect(20, 75, 280, 65, theme.bg);
+        _tft->setTextDatum(MC_DATUM);
+        _tft->setTextPadding(280); 
 
         _tft->setTextColor(theme.text, theme.bg);
-        _tft->setTextDatum(MC_DATUM);
-        _tft->drawString(LangManager::get("calib_current_hotend") + String(currentTemp, 1) + " C", 160, 90, 2);
-
-        if (mpcDone) {
-            _tft->setTextColor(TFT_GREEN, theme.bg);
-            _tft->drawString(LangManager::get("calib_mpc_done"), 160, 120, 2);
-            UIUtils::drawButton(_tft, 20, 155, 280, 38, LangManager::get("calib_btn_save_eeprom"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
-        } else {
-            _tft->setTextColor(TFT_ORANGE, theme.bg);
-            _tft->drawString(LangManager::get("calib_waiting_cycles"), 160, 120, 1);
-        }
+        _tft->drawString(LangManager::get("calib_current_hotend") + currentTempStr + " C", 160, 90, 2);
+        
+        _tft->setTextPadding(0);
     }
 }
 
@@ -304,7 +375,9 @@ int OctoOtherCalibrationMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClient
             _mpcSubState = 0;
             _pidCommandSent = false;
             _mpcCommandSent = false;
+            _checkedRunningState = false;
             _forceRedraw = true;
+            if (client) client->clearPidDone();
         }
         return 1;
     }
@@ -320,11 +393,15 @@ int OctoOtherCalibrationMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClient
         }
         if (y >= 120 && y <= 156) {
             UIUtils::pressFeedback(_tft, 20, 120, 280, 36, LangManager::get("calib_btn_pid"), theme.cardBg, theme.text, 2, 5);
-            _subState = 2; _pidSubState = 0; _pidCommandSent = false; _forceRedraw = true; return 1;
+            _subState = 2; _pidSubState = client && client->isPidRunning() ? 1 : 0; 
+            _pidCommandSent = client && client->isPidRunning(); 
+            _forceRedraw = true; return 1;
         }
         if (y >= 165 && y <= 201) {
             UIUtils::pressFeedback(_tft, 20, 165, 280, 36, LangManager::get("calib_btn_mpc"), theme.cardBg, theme.text, 2, 5);
-            _subState = 3; _mpcSubState = 0; _mpcCommandSent = false; _forceRedraw = true; return 1;
+            _subState = 3; _mpcSubState = client && client->isMpcRunning() ? 1 : 0; 
+            _mpcCommandSent = client && client->isMpcRunning(); 
+            _forceRedraw = true; return 1;
         }
         return -1;
     }
@@ -394,15 +471,24 @@ int OctoOtherCalibrationMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClient
             if (y >= 208) { _subState = 0; _forceRedraw = true; return 1; }
             if (y >= 160 && y <= 198) {
                 if (!_pidCommandSent) {
+                    Serial.println("[PID CALIB] Indítás gomb megnyomva. PID Autotune indítása MQTT-n keresztül...");
                     UIUtils::pressFeedback(_tft, 20, 160, 280, 38, LangManager::get("calib_pid_start_btn"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
                     if (client) {
-                        client->sendGcodeCommand("M106 S255");
-                        client->sendGcodeCommand("M303 E0 S200 C5");
+                        client->startPidAutotune();
                     }
                     _pidCommandSent = true;
                     _pidSubState = 1;
                     _forceRedraw = true;
                 }
+                return 1;
+            }
+        } else if (_pidSubState == 1) {
+            if (y >= 208) {
+                Serial.println("[PID CALIB] Vissza gomb megnyomva a futási képernyőről (háttérben fut tovább).");
+                UIUtils::pressFeedback(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
+                _subState = 0;
+                _pidSubState = 0;
+                _forceRedraw = true;
                 return 1;
             }
         }
@@ -414,14 +500,24 @@ int OctoOtherCalibrationMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClient
             if (y >= 208) { _subState = 0; _forceRedraw = true; return 1; }
             if (y >= 160 && y <= 198) {
                 if (!_mpcCommandSent) {
+                    Serial.println("[MPC CALIB] Indítás gomb megnyomva. MPC Autotune indítása MQTT-n keresztül...");
                     UIUtils::pressFeedback(_tft, 20, 160, 280, 38, LangManager::get("calib_mpc_start_btn"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
                     if (client) {
-                        client->sendGcodeCommand("M306 T");
+                        client->startMpcAutotune();
                     }
                     _mpcCommandSent = true;
                     _mpcSubState = 1;
                     _forceRedraw = true;
                 }
+                return 1;
+            }
+        } else if (_mpcSubState == 1) {
+            if (y >= 208) {
+                Serial.println("[MPC CALIB] Vissza gomb megnyomva a futási képernyőről (háttérben fut tovább).");
+                UIUtils::pressFeedback(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
+                _subState = 0;
+                _mpcSubState = 0;
+                _forceRedraw = true;
                 return 1;
             }
         }

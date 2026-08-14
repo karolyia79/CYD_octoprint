@@ -29,6 +29,22 @@ public:
     void setSpeed(int percent);
     void adjustZOffset(float delta);
 
+    // PID és MPC vezérlés
+    void startPidAutotune();
+    void startMpcAutotune();
+    void stopCalibration();
+    bool isPidDone() const { return _pidDone; }
+    void clearPidDone() { _pidDone = false; }
+
+    // --- ÚJ: Futási állapotok lekérdezése ---
+    bool isPidRunning() const { return _pidRunning; }
+    bool isMpcRunning() const { return _mpcRunning; }
+    // ----------------------------------------
+
+    // Ismeretlen parancs hiba kezelés
+    bool hasUnknownCommandError() const { return _unknownCommandError; }
+    void clearUnknownCommandError() { _unknownCommandError = false; }
+
     // Átirányított állapotlekérdezések
     OctoClient* getBaseClient() const { return _base; }
     const OctoPrinterData& getData() const { return _base->getData(); }
@@ -56,9 +72,17 @@ private:
     bool _busySeen = false;
     bool _pendingClearWatchers = false;
     bool _seenAxisReport = false;
+    bool _unknownCommandError = false;
     unsigned long _cmdStartTime = 0;
     unsigned long _lastBusyTime = 0;
     
+    // PID és MPC belső állapotok
+    bool _pidRunning = false;
+    bool _mpcRunning = false;
+    bool _pidDone = false;
+    int _pidPhase = 0;
+    float _pidKp = 0, _pidKi = 0, _pidKd = 0;
+
     String _brokerIp;
     int _port;
     unsigned long _lastReconnectAttempt = 0;

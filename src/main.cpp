@@ -10,6 +10,7 @@
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <CST820.h>
+#include <Preferences.h>
 
 TFT_eSPI tft = TFT_eSPI();
 CST820 touch(33, 32, -1, 4);
@@ -211,14 +212,19 @@ void setup() {
     Serial.printf("[SYSTEM MEMORY] Minimális szabad heap: %u byte\n", ESP.getMinFreeHeap());
     Serial.println("==============================================\n");
 
+    // --- CRASH RECOVERY KEZELÉSE A SPLASHSCREEN-BEN ---
+    splash.handleCrashRecovery(octoMqtt, &touch);
+    // ----------------------------------------------------
+
     bool pluginMissing = (octoClient && octoClient->isPluginMissing());
     bool mqttError = (isOctoEnabled && !pluginMissing && !mqttConnected);
 
     if (pluginMissing || mqttError) {
         splash.showConnectedInfo(WiFi.localIP().toString(), isOctoEnabled, isKlipperEnabled, pluginMissing, mqttConnected);
         while (true) {
-            uint16_t tx, ty;
-            if (splash.getTouch(&tx, &ty)) {
+            uint16_t raw_x = 0, raw_y = 0;
+            uint8_t gesture = 0;
+            if (touch.getTouch(&raw_x, &raw_y, &gesture)) {
                 delay(150);
                 break;
             }

@@ -11,7 +11,17 @@ public:
     void draw(OctoClientMqtt* client);
     int handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client);
     void forceRedraw() { _forceRedraw = true; }
-    void open() { _forceRedraw = true; _subState = 0; _estepSubState = 0; _pidSubState = 0; _mpcSubState = 0; _showPopup = false; _pidCommandSent = false; _mpcCommandSent = false; }
+    void open() { 
+        _forceRedraw = true; 
+        _subState = 0; 
+        _estepSubState = 0; 
+        _pidSubState = 0; 
+        _mpcSubState = 0; 
+        _showPopup = false; 
+        _pidCommandSent = false; 
+        _mpcCommandSent = false; 
+        _checkedRunningState = false;
+    }
 
 private:
     TFT_eSPI* _tft;
@@ -23,6 +33,7 @@ private:
 
     bool _pidCommandSent = false;
     bool _mpcCommandSent = false;
+    bool _checkedRunningState = false;
 
     float _estepDiff = 0.0f;
     int _targetTemp = 200;

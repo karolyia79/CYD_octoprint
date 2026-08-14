@@ -1,5 +1,6 @@
 #include "splashscreen.h"
 #include "lang_manager.h"
+#include <Preferences.h>
 
 SplashScreen::SplashScreen(TFT_eSPI* tft) : _tft(tft) {}
 
@@ -137,6 +138,80 @@ void SplashScreen::showConnectedInfo(const String& localIp, bool octoActive, boo
 
         _tft->setTextColor(TFT_YELLOW, TFT_BLACK);
         _tft->drawString(LangManager::get("splash_webui_available"), 20, 195, 1);
+    }
+}
+
+void SplashScreen::showCalibrationCrashWarning() {
+    _tft->fillScreen(TFT_BLACK);
+    _hasError = true;
+    
+    _tft->setTextColor(TFT_RED, TFT_BLACK);
+    _tft->setTextDatum(MC_DATUM);
+    _tft->drawString("FIGYELEM: RENDSZERHIBA!", 160, 25, 2);
+
+    _tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    _tft->setTextDatum(ML_DATUM);
+    _tft->drawString("A nyomtatót manuálisan", 20, 60, 2);
+    _tft->drawString("indítsd újra először!", 20, 85, 2);
+    
+    _tft->setTextColor(TFT_YELLOW, TFT_BLACK);
+    _tft->drawString("Addig ne nyomj az OK-ra,", 20, 120, 1);
+    _tft->drawString("különben az OctoPrint nem", 20, 137, 1);
+    _tft->drawString("kommunikál a nyomtatóval,", 20, 154, 1);
+    _tft->drawString("és szerver hiba fog fellépni!", 20, 171, 1);
+
+    // OK Gomb kirajzolása (X: 95-225, Y: 190-225)
+    _tft->fillRoundRect(95, 190, 130, 35, 6, _tft->color565(60, 60, 60));
+    _tft->drawRoundRect(95, 190, 130, 35, 6, TFT_WHITE);
+    _tft->setTextColor(TFT_WHITE, _tft->color565(60, 60, 60));
+    _tft->setTextDatum(MC_DATUM);
+    _tft->drawString("OK", 160, 207, 2);
+}
+
+void SplashScreen::handleCrashRecovery(OctoClientMqtt* mqttClient, CST820* globalTouch) {
+    Preferences prefs;
+    prefs.begin("octoklip", false); 
+    
+    if (!prefs.isKey("calib_active")) {
+        prefs.putBool("calib_active", false);
+        Serial.println("[CRASH RECOVERY] 'calib_active' kulcs nem létezett, létrehozva false értékkel.");
+    }
+    
+    bool calibCrash = prefs.getBool("calib_active", false);
+    prefs.end();
+
+    if (calibCrash) {
+        Serial.println("[CRASH RECOVERY] Kalibráció közbeni leállás észlelve! Vészleállás küldése (M112)...");
+        
+        if (mqttClient) {
+            mqttClient->sendGcodeCommand("M112");
+        }
+        
+        this->showCalibrationCrashWarning();
+        
+        while (true) {
+            uint16_t raw_x = 0, raw_y = 0;
+            uint8_t gesture = 0;
+            
+            if (globalTouch->getTouch(&raw_x, &raw_y, &gesture)) {
+                uint16_t tx = raw_y;
+                uint16_t ty = 240 - raw_x;
+
+                if (tx >= 95 && tx <= 225 && ty >= 190 && ty <= 225) {
+                    delay(150);
+                    break;
+                }
+            }
+            delay(50);
+        }
+
+        prefs.begin("octoklip", false);
+        prefs.putBool("calib_active", false);
+        prefs.end();
+        Serial.println("[CRASH RECOVERY] A változó értéke leokézás után visszaállítva false-ra. ESP újraindítása...");
+        
+        delay(500);
+        ESP.restart();
     }
 }
 
