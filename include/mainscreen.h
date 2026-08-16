@@ -4,10 +4,8 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <CST820.h>
-#include "octo_client.h"
 #include "octo_client_mqtt.h"
 #include "klipper_client.h"
-#include "octo_menu.h"
 #include "octo_menu_mqtt.h"
 #include "klipper_menu.h"
 #include "menuscreen.h"
@@ -15,7 +13,7 @@
 
 class MainScreen {
 public:
-    MainScreen(TFT_eSPI* tft, CST820* touch, bool octoEnabled, bool klipperEnabled, OctoClient* octoBase, OctoClientMqtt* octoMqtt);
+    MainScreen(TFT_eSPI* tft, CST820* touch, bool octoEnabled, bool klipperEnabled, OctoClientMqtt* octoMqtt);
     
     void init();
     void draw(const OctoPrinterData& octoData, const KlipperPrinterData& klipperData);
@@ -27,7 +25,6 @@ private:
     
     bool _octoEnabled;
     bool _klipperEnabled;
-    OctoClient* _octoClient;
     OctoClientMqtt* _octoMqtt;
     
     int _currentPage = 0; 
@@ -47,7 +44,6 @@ private:
     int _klipperLastProgress = -1;
     String _klipperLastStatus = "";
 
-    OctoMenu _octoMenu;
     OctoMenuMqtt _octoMenuMqtt;
     KlipperMenu _klipperMenu;
     MenuScreen _menuScreen;

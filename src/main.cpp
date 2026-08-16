@@ -3,7 +3,6 @@
 #include "lang_manager.h"
 #include "mainscreen.h"
 #include "menuscreen.h"
-#include "octo_client.h"
 #include "klipper_client.h"
 #include "octo_client_mqtt.h"
 #include "mqtt_monitor.h"
@@ -25,14 +24,13 @@ WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 MqttMonitor mqttMonitor;
 
-OctoClient* octoClient = nullptr;
 OctoClientMqtt* octoMqtt = nullptr;
 KlipperClient* klipperClient = nullptr;
 MainScreen* mainScreen = nullptr;
 MenuScreen* menuScreen = nullptr;
 
-unsigned long lastPrinterUpdate = 0;
-const unsigned long UPDATE_INTERVAL = 5000;
+unsigned long lastKlipperUpdate = 0;
+const unsigned long KLIPPER_UPDATE_INTERVAL = 5000;
 
 TaskHandle_t NetworkTask = nullptr;
 
@@ -48,25 +46,17 @@ void networkTaskCode(void * pvParameters) {
     for(;;) {
         ConnectionManager::update();
 
+        // MQTT frissítés ciklus
         if (octoMqtt) {
             octoMqtt->update();
         }
 
-        unsigned long currentInterval = UPDATE_INTERVAL;
-        if (octoClient && octoClient->isMeshBuilding()) {
-            currentInterval = 1000;
-        }
-
-        bool isMqttConnected = (octoMqtt && octoMqtt->isConnected());
-
-        if (millis() - lastPrinterUpdate > currentInterval) {
-            if (isOctoEnabled && octoClient && !isMqttConnected) {
-                octoClient->update(); 
-            }
+        // Klipper HTTP frissítés (ha engedélyezve van)
+        if (millis() - lastKlipperUpdate > KLIPPER_UPDATE_INTERVAL) {
             if (isKlipperEnabled && klipperClient) {
                 klipperClient->update();
             }
-            lastPrinterUpdate = millis(); 
+            lastKlipperUpdate = millis(); 
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
@@ -74,8 +64,6 @@ void networkTaskCode(void * pvParameters) {
 
 enum AppState { STATE_MAIN, STATE_MENU };
 AppState currentState = STATE_MAIN;
-
-static int savedPage = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -124,13 +112,12 @@ void setup() {
     isOctoEnabled = cfg.octo_enabled;
     isKlipperEnabled = cfg.klipper_enabled;
 
-    octoClient = new OctoClient(cfg.octo_ip, cfg.octo_key);
     klipperClient = new KlipperClient(cfg.klipper_ip);
 
     mqttClient.setCallback(mqttCallback);
-    octoMqtt = new OctoClientMqtt(octoClient, &mqttClient, &mqttMonitor);
+    octoMqtt = new OctoClientMqtt(&mqttClient, &mqttMonitor);
 
-    mainScreen = new MainScreen(&tft, &touch, isOctoEnabled, isKlipperEnabled, octoClient, octoMqtt);
+    mainScreen = new MainScreen(&tft, &touch, isOctoEnabled, isKlipperEnabled, octoMqtt);
     menuScreen = new MenuScreen(&tft, &touch); 
 
     splash.showMessage(LangManager::get("sys_net_start"), TFT_ORANGE);
@@ -175,20 +162,14 @@ void setup() {
         apManager.startServer();
     }
 
-    splash.showMessage(LangManager::get("boot_octo_check"), TFT_WHITE);
-    splash.drawProgressBar(70);
-    if (isOctoEnabled && octoClient) {
-        octoClient->update(); 
-    }
-
     splash.showMessage(LangManager::get("boot_mqtt_check"), TFT_WHITE);
     splash.drawProgressBar(85);
-    bool mqttConnected = true;
+    bool mqttConnected = false;
     if (isOctoEnabled && octoMqtt) {
         octoMqtt->begin(cfg.octo_ip, 1883);
         
         unsigned long mqttStart = millis();
-        while (millis() - mqttStart < 1500) {
+        while (millis() - mqttStart < 2000) {
             octoMqtt->update();
             if (octoMqtt->isConnected()) break;
             delay(50);
@@ -196,13 +177,6 @@ void setup() {
         mqttConnected = octoMqtt->isConnected();
     }
 
-    splash.showMessage(LangManager::get("boot_bridge_check"), TFT_WHITE);
-    splash.drawProgressBar(95);
-    if (isOctoEnabled && octoClient) {
-        octoClient->checkPluginAvailability(); 
-    }
-
-    // Rendszer kész - Szabad memória kiírása a terminálba
     splash.showMessage(LangManager::get("boot_sys_ready"), TFT_GREEN);
     splash.drawProgressBar(100);
     delay(200);
@@ -212,15 +186,10 @@ void setup() {
     Serial.printf("[SYSTEM MEMORY] Minimális szabad heap: %u byte\n", ESP.getMinFreeHeap());
     Serial.println("==============================================\n");
 
-    // --- CRASH RECOVERY KEZELÉSE A SPLASHSCREEN-BEN ---
     splash.handleCrashRecovery(octoMqtt, &touch);
-    // ----------------------------------------------------
 
-    bool pluginMissing = (octoClient && octoClient->isPluginMissing());
-    bool mqttError = (isOctoEnabled && !pluginMissing && !mqttConnected);
-
-    if (pluginMissing || mqttError) {
-        splash.showConnectedInfo(WiFi.localIP().toString(), isOctoEnabled, isKlipperEnabled, pluginMissing, mqttConnected);
+    if (isOctoEnabled && !mqttConnected) {
+        splash.showConnectedInfo(WiFi.localIP().toString(), isOctoEnabled, isKlipperEnabled, false, mqttConnected);
         while (true) {
             uint16_t raw_x = 0, raw_y = 0;
             uint8_t gesture = 0;
@@ -235,10 +204,8 @@ void setup() {
     tft.fillScreen(TFT_BLACK);
     if (mainScreen) {
         mainScreen->init();
-        
-        if (isOctoEnabled) octoClient->update();
         if (isKlipperEnabled) klipperClient->update();
-        mainScreen->draw(octoClient->getData(), klipperClient->getData());
+        mainScreen->draw(octoMqtt->getData(), klipperClient->getData());
     }
 
     xTaskCreatePinnedToCore(
@@ -255,17 +222,15 @@ void loop() {
     apManager.handleClient();
 
     if (currentState == STATE_MAIN && mainScreen) {
-        mainScreen->draw(octoClient->getData(), klipperClient->getData());
+        mainScreen->draw(octoMqtt->getData(), klipperClient->getData());
 
         int touchAction = mainScreen->handleTouch();
 
-        if (touchAction == 1) { 
-        } 
-        else if (touchAction == 2) { 
-            Serial.println("[ACTION] OctoPrint szüneteltetése");
+        if (touchAction == 2) { 
+            Serial.println("[ACTION] OctoPrint szüneteltetése (MQTT)");
         }
         else if (touchAction == 4) { 
-            Serial.println("[ACTION] OctoPrint megszakítása");
+            Serial.println("[ACTION] OctoPrint megszakítása (MQTT)");
         }
         else if (touchAction == 12) { 
             Serial.println("[ACTION] Klipper szüneteltetése");
@@ -273,21 +238,9 @@ void loop() {
         else if (touchAction == 14) { 
             Serial.println("[ACTION] Klipper megszakítása");
         }
-        else if (touchAction == 20) {
-            Serial.println("[MENU ACTION] OctoPrint Filament / Temp menü");
-        }
-        else if (touchAction == 21) {
-            Serial.println("[MENU ACTION] OctoPrint Speed / Flow menü");
-        }
-        else if (touchAction == 30) {
-            Serial.println("[MENU ACTION] Klipper Makrók menü");
-        }
-        else if (touchAction == 31) {
-            Serial.println("[MENU ACTION] Klipper Tune / Z-Offset menü");
-        }
     }
     else if (currentState == STATE_MENU && menuScreen) {
-        menuScreen->draw(isOctoEnabled, octoClient->getData().connected, false, 
+        menuScreen->draw(isOctoEnabled, octoMqtt->isConnected(), false, 
                          isKlipperEnabled, klipperClient->getData().connected, false);
     }
 

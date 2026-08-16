@@ -102,7 +102,6 @@ PrinterConfig ConfigManager::loadConfig(bool forceReload) {
 
     if (doc.containsKey("octo_enabled")) config.octo_enabled = doc["octo_enabled"].as<bool>();
     if (doc.containsKey("octo_ip")) config.octo_ip = doc["octo_ip"].as<String>();
-    if (doc.containsKey("octo_key")) config.octo_key = doc["octo_key"].as<String>();
 
     if (doc.containsKey("klipper_enabled")) config.klipper_enabled = doc["klipper_enabled"].as<bool>();
     if (doc.containsKey("klipper_ip")) config.klipper_ip = doc["klipper_ip"].as<String>();
@@ -161,7 +160,6 @@ bool ConfigManager::saveConfig(const PrinterConfig& config) {
 
     doc["octo_enabled"] = config.octo_enabled;
     doc["octo_ip"] = config.octo_ip;
-    doc["octo_key"] = config.octo_key;
 
     doc["klipper_enabled"] = config.klipper_enabled;
     doc["klipper_ip"] = config.klipper_ip;

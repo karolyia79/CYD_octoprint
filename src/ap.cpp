@@ -264,7 +264,6 @@ void APManager::setupRoutes() {
         html += "<label for='octo_enabled' style='margin-bottom:0; color:#38bdf8;'>" + LangManager::get("ap_octo_enabled") + "</label>";
         html += "</div>";
         html += "<label>" + LangManager::get("ap_octo_ip") + "</label><input type='text' name='octo_ip' value='" + cfg.octo_ip + "'>";
-        html += "<label>" + LangManager::get("ap_octo_key") + "</label><input type='text' name='octo_key' value='" + cfg.octo_key + "'>";
         html += "</div>";
 
         html += "<div class='card'>";
@@ -371,7 +370,6 @@ void APManager::setupRoutes() {
 
         cfg.octo_enabled = (_server.arg("octo_enabled") == "true");
         cfg.octo_ip = _server.arg("octo_ip");
-        cfg.octo_key = _server.arg("octo_key");
 
         cfg.klipper_enabled = (_server.arg("klipper_enabled") == "true");
         cfg.klipper_ip = _server.arg("klipper_ip");

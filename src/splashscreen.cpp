@@ -1,5 +1,6 @@
 #include "splashscreen.h"
 #include "lang_manager.h"
+#include "release.h"
 #include <Preferences.h>
 
 SplashScreen::SplashScreen(TFT_eSPI* tft) : _tft(tft) {}
@@ -28,6 +29,12 @@ void SplashScreen::drawProgressBar(int progress) {
     if (fillWidth > 0) {
         _tft->fillRect(42, 152, fillWidth, 12, TFT_DARKGREEN);
     }
+
+    // FW verzió és Build név kiírása a progressbar alá
+    _tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+    _tft->setTextDatum(TC_DATUM);
+    String verStr = String(FW_VERSION) + " " + String(FW_BUILD_NAME);
+    _tft->drawString(verStr, 160, 178, 2);
 }
 
 void SplashScreen::showAPInfo(const String& ssid, const String& pass, const String& ip, bool clientConnected, const String& wifiError) {

@@ -7,6 +7,7 @@
 #include "octo_bedlevel_menu_mqtt.h"
 #include "octo_other_calibration_mqtt.h"
 #include "octo_control_menu_mqtt.h"
+#include "octo_filament_menu_mqtt.h"
 
 class OctoMenuMqtt {
 public:
@@ -24,6 +25,7 @@ private:
     OctoBedLevelMenuMqtt _bedLevelMenu;
     OctoOtherCalibrationMenuMqtt _otherCalibMenu;
     OctoControlMenuMqtt _controlMenu;
+    OctoFilamentMenuMqtt _filamentMenu;
 
     enum SubState {
         SUB_MAIN, SUB_PREPARE, SUB_CONTROL, SUB_CALIBRATION,
@@ -32,6 +34,11 @@ private:
     };
     int _subState = SUB_MAIN;
     bool _forceRedraw = true;
+
+    // --- Z-Offset állapotváltozók ---
+    bool _zHomed = false;          // Zárolási flag fallback-hez
+    float _zStepSize = 0.05f;      // Alapértelmezett lépésköz (0.01, 0.05, 0.10, 0.50 mm)
+    float _zOffsetDelta = 0.000f;  // Összesített session elmozdulás
 
     bool _lastMeshSavedPopupState = false;
     bool _lastNoMeshPopupState = false;
@@ -43,14 +50,14 @@ private:
     void drawMainMenu();
     void drawPrepareMenu(OctoClientMqtt* client = nullptr);
     void drawCalibrationMenu();
-    void drawFilamentMenu();
     void drawTuneMenu(OctoClientMqtt* client);
-    void drawZOffsetMenu();
+    void drawZOffsetMenu(OctoClientMqtt* client = nullptr);
     void drawMeshMenu(OctoClientMqtt* client);
     void drawShowMeshMenu(OctoClientMqtt* client);
 
     void updatePrepareMenu(OctoClientMqtt* client, bool force = false);
     void updateMeshButtons(OctoClientMqtt* client);
+    void updateZOffsetPrepButton(OctoClientMqtt* client, bool force = false);
 
     void drawTuneRow(int y, const String& label, const String& valueStr);
     void drawMeshSavedPopup();

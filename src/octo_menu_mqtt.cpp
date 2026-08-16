@@ -4,15 +4,23 @@
 #include "config_manager.h"
 #include <math.h>
 
-OctoMenuMqtt::OctoMenuMqtt(TFT_eSPI* tft) : _tft(tft), _bedLevelMenu(tft), _otherCalibMenu(tft), _controlMenu(tft) {
+OctoMenuMqtt::OctoMenuMqtt(TFT_eSPI* tft) 
+    : _tft(tft), _bedLevelMenu(tft), _otherCalibMenu(tft), _controlMenu(tft), _filamentMenu(tft) {
     _bedLevelMenu.init();
     _otherCalibMenu.init();
     _controlMenu.init();
+    _filamentMenu.init();
 }
 
 void OctoMenuMqtt::draw(OctoClientMqtt* client) {
     bool meshSavedActive = client ? client->shouldShowMeshSavedPopup() : false;
     bool noMeshActive = client ? client->shouldShowNoMeshPopup() : false;
+
+    // Ha megszűnt bármelyik popup, azonnal kényszerítsük a menü újrarajzolását!
+    if ((_lastMeshSavedPopupState && !meshSavedActive) || 
+        (_lastNoMeshPopupState && !noMeshActive)) {
+        _forceRedraw = true;
+    }
 
     if (meshSavedActive || noMeshActive || _showUnsupportedPopup) {
         
@@ -29,6 +37,7 @@ void OctoMenuMqtt::draw(OctoClientMqtt* client) {
         if (_showUnsupportedPopup) {
             if (millis() - _unsupportedPopupStartMs > 3500) {
                 _showUnsupportedPopup = false; 
+                _forceRedraw = true;
             }
         }
 
@@ -59,8 +68,6 @@ void OctoMenuMqtt::draw(OctoClientMqtt* client) {
                 bool homing = client ? client->isHoming() : false;
 
                 if (subStateChanged || (prevHoming && !homing)) {
-                    Serial.printf("[%lu ms] [UI PREPARE DRAW] Képernyő újrarajzolása! subStateChanged=%d, prevHoming=%d, homing=%d\n",
-                                  millis(), subStateChanged, prevHoming, homing);
                     drawPrepareMenu(client);
                 } else if (homing) {
                     updatePrepareMenu(client); 
@@ -76,7 +83,7 @@ void OctoMenuMqtt::draw(OctoClientMqtt* client) {
             if (subStateChanged) drawCalibrationMenu(); 
             break;
         case SUB_FILAMENT:  
-            if (subStateChanged) drawFilamentMenu(); 
+            _filamentMenu.draw(client);
             break;
         case SUB_TUNE:      
             {
@@ -97,7 +104,20 @@ void OctoMenuMqtt::draw(OctoClientMqtt* client) {
             } 
             break;
         case SUB_Z_OFFSET:  
-            if (subStateChanged) drawZOffsetMenu(); 
+            {
+                static bool prevPrepRunning = false;
+                static bool prevReady = false;
+                bool currPrepRunning = client ? client->isZOffsetPrepRunning() : false;
+                bool currReady = client ? client->isZOffsetReady() : _zHomed;
+
+                if (subStateChanged || currPrepRunning != prevPrepRunning || currReady != prevReady) {
+                    drawZOffsetMenu(client);
+                    prevPrepRunning = currPrepRunning;
+                    prevReady = currReady;
+                } else if (currPrepRunning) {
+                    updateZOffsetPrepButton(client);
+                }
+            }
             break;
         case SUB_MESH:      
             {
@@ -164,6 +184,20 @@ void OctoMenuMqtt::updateMeshButtons(OctoClientMqtt* client) {
     UIUtils::drawButton(_tft, 170, 75, 135, 40, building ? LangManager::get("octo_btn_measuring") : LangManager::get("octo_btn_build_5x5"), btnColor, theme.text, false, 2, 5);
 }
 
+void OctoMenuMqtt::updateZOffsetPrepButton(OctoClientMqtt* client, bool force) {
+    static unsigned long lastPulseUpdate = 0;
+    bool isPrepRunning = client ? client->isZOffsetPrepRunning() : false;
+
+    if (!isPrepRunning) return;
+
+    unsigned long now = millis();
+    if (force || now - lastPulseUpdate > 80) {
+        lastPulseUpdate = now;
+        uint16_t btnBg = getPulsingColor();
+        UIUtils::drawButton(_tft, 20, 75, 280, 40, "Pozicionalas (G28 + Z0)...", btnBg, TFT_BLACK, false, 2, 5);
+    }
+}
+
 void OctoMenuMqtt::updatePrepareMenu(OctoClientMqtt* client, bool force) {
     ThemeColors theme = getCurrentTheme();
     static unsigned long lastPulseUpdate = 0;
@@ -178,9 +212,6 @@ void OctoMenuMqtt::updatePrepareMenu(OctoClientMqtt* client, bool force) {
         lastBtnColor = btnColor;
 
         String homeTxt = homing ? LangManager::get("octo_btn_homing") : LangManager::get("octo_btn_autohome");
-
-        Serial.printf("[%lu ms] [UI GOMB RAJZOLÁS] Text: '%s' | Color: 0x%04X | isHoming: %s | Force: %d\n",
-                      millis(), homeTxt.c_str(), btnColor, homing ? "TRUE" : "FALSE", force);
 
         UIUtils::drawButton(_tft, 20, 75, 280, 40, homeTxt, btnColor, theme.text, false, 2, 5);
     }
@@ -259,7 +290,7 @@ void OctoMenuMqtt::drawPrepareMenu(OctoClientMqtt* client) {
     updatePrepareMenu(client, true);
     UIUtils::drawButton(_tft, 20, 120, 280, 35, LangManager::get("octo_btn_steppers_off"), theme.cardBg, theme.text, false, 2, 5);
     
-    UIUtils::drawButton(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, false, 2, 5);
+    UIUtils::drawButton(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), theme.cardBg, theme.text, false, 2, 5);
 
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
@@ -275,20 +306,6 @@ void OctoMenuMqtt::drawCalibrationMenu() {
     UIUtils::drawButton(_tft, 170, 75, 130, 55, LangManager::get("octo_btn_bedmesh"), theme.cardBg, theme.text, false, 2, 5);
     UIUtils::drawButton(_tft, 20, 138, 130, 55, LangManager::get("octo_btn_leveling"), theme.cardBg, theme.text, false, 2, 5);
     UIUtils::drawButton(_tft, 170, 138, 130, 55, LangManager::get("octo_btn_other"), theme.cardBg, theme.text, false, 2, 5);
-
-    UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
-}
-
-void OctoMenuMqtt::drawFilamentMenu() {
-    ThemeColors theme = getCurrentTheme();
-    _tft->fillRect(10, 45, 300, 190, theme.bg);
-    _tft->setTextColor(theme.accent, theme.bg);
-    _tft->setTextDatum(TC_DATUM);
-    _tft->drawString(LangManager::get("octo_menu_filament_title"), 160, 48, 2);
-
-    _tft->setTextColor(theme.subText, theme.bg);
-    _tft->setTextDatum(MC_DATUM);
-    _tft->drawString(LangManager::get("octo_coming_soon"), 160, 120, 2);
 
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
@@ -332,27 +349,66 @@ void OctoMenuMqtt::drawTuneMenu(OctoClientMqtt* client) {
     UIUtils::drawButton(_tft, 20, 208, 280, 24, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
-void OctoMenuMqtt::drawZOffsetMenu() {
+void OctoMenuMqtt::drawZOffsetMenu(OctoClientMqtt* client) {
     ThemeColors theme = getCurrentTheme();
     _tft->fillRect(10, 45, 300, 190, theme.bg);
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
     _tft->drawString(LangManager::get("octo_menu_zoffset_title"), 160, 48, 2);
 
-    UIUtils::drawButton(_tft, 20, 75, 280, 34, LangManager::get("octo_btn_zhome"), theme.cardBg, theme.text, false, 2, 5);
+    bool isReady = client ? client->isZOffsetReady() : _zHomed;
+    bool isPrepRunning = client ? client->isZOffsetPrepRunning() : false;
 
-    UIUtils::drawButton(_tft, 15, 118, 55, 34, "-0.01", theme.cardBg, theme.text, false, 1, 4);
+    if (!isReady) {
+        uint16_t btnBg = isPrepRunning ? getPulsingColor() : TFT_ORANGE;
+        uint16_t btnTxt = TFT_BLACK;
+        String btnText = isPrepRunning ? "Pozicionalas (G28 + Z0)..." : "Kalib. inditasa (G28 + Z=0)";
 
-    _tft->fillRoundRect(75, 118, 170, 34, 4, theme.cardBg);
-    _tft->setTextColor(theme.accent, theme.cardBg);
-    _tft->setTextDatum(MC_DATUM);
-    _tft->drawString(LangManager::get("octo_label_zoffset_adj"), 160, 135, 2);
+        UIUtils::drawButton(_tft, 20, 75, 280, 40, btnText, btnBg, btnTxt, false, 2, 5);
 
-    UIUtils::drawButton(_tft, 250, 118, 55, 34, "+0.01", theme.cardBg, theme.text, false, 1, 4);
+        _tft->fillRoundRect(20, 125, 280, 70, 6, theme.cardBg);
+        _tft->setTextColor(isPrepRunning ? theme.accent : TFT_RED, theme.cardBg);
+        _tft->setTextDatum(MC_DATUM);
+        
+        if (isPrepRunning) {
+            _tft->drawString("G28 es G1 Z0 F300 folyamatban...", 160, 148, 1);
+            _tft->drawString("Varj az 'OK' megérkezeseig!", 160, 168, 1);
+        } else {
+            _tft->drawString("Inditas szükseges!", 160, 145, 2);
+            _tft->drawString("A beallitashoz nyomj a fenti gombra!", 160, 168, 1);
+        }
 
-    UIUtils::drawButton(_tft, 20, 160, 280, 34, LangManager::get("octo_btn_save"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
+        UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
+    } else {
+        UIUtils::drawButton(_tft, 15, 65, 60, 45, "-", theme.cardBg, theme.text, false, 4, 4);
 
-    UIUtils::drawButton(_tft, 20, 200, 280, 28, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 5);
+        _tft->fillRoundRect(82, 65, 156, 45, 6, theme.cardBg);
+        _tft->drawRoundRect(82, 65, 156, 45, 6, theme.accent);
+        _tft->setTextColor(theme.accent, theme.cardBg);
+        _tft->setTextDatum(MC_DATUM);
+        String valStr = (_zOffsetDelta >= 0 ? "+" : "") + String(_zOffsetDelta, 3) + " mm";
+        _tft->drawString(valStr, 160, 82, 4);
+        _tft->setTextColor(theme.subText, theme.cardBg);
+        _tft->drawString("Z-Offset Módosítás", 160, 100, 1);
+
+        UIUtils::drawButton(_tft, 245, 65, 60, 45, "+", theme.cardBg, theme.text, false, 4, 4);
+
+        auto drawStepBtn = [&](int x, float stepVal, const char* label) {
+            bool isActive = (fabs(_zStepSize - stepVal) < 0.001f);
+            uint16_t bg = isActive ? theme.accent : theme.cardBg;
+            uint16_t txt = isActive ? theme.bg : theme.text;
+            UIUtils::drawButton(_tft, x, 118, 64, 32, label, bg, txt, false, 2, 4);
+        };
+
+        drawStepBtn(15,  0.01f, "0.01");
+        drawStepBtn(89,  0.05f, "0.05");
+        drawStepBtn(163, 0.10f, "0.10");
+        drawStepBtn(237, 0.50f, "0.50");
+
+        UIUtils::drawButton(_tft, 15, 158, 290, 36, "Mentés (M500) & Újra-home", TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
+
+        UIUtils::drawButton(_tft, 15, 202, 290, 28, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
+    }
 }
 
 void OctoMenuMqtt::drawMeshMenu(OctoClientMqtt* client) {
@@ -444,18 +500,21 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
 
     if (_showUnsupportedPopup) {
         _showUnsupportedPopup = false;
+        _forceRedraw = true;
         draw(client);
         return 1;
     }
 
     if (client && client->shouldShowMeshSavedPopup()) {
         client->dismissMeshSavedPopup();
+        _forceRedraw = true;
         draw(client);
         return 1;
     }
 
     if (client && client->shouldShowNoMeshPopup()) {
         client->dismissNoMeshPopup();
+        _forceRedraw = true;
         draw(client);
         return 1;
     }
@@ -487,7 +546,8 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
             } else if (x >= 170 && x <= 300) {
                 UIUtils::pressFeedback(_tft, 170, 138, 130, 55, LangManager::get("octo_btn_filament_btn"), theme.cardBg, theme.text, 2, 5);
                 _subState = SUB_FILAMENT;
-                drawFilamentMenu();
+                _filamentMenu.open();
+                _filamentMenu.draw(client);
                 return 1;
             }
         }
@@ -504,12 +564,10 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
         
         if (y >= 75 && y <= 115) {
             if (client && client->isHoming()) {
-                Serial.printf("[%lu ms] [UI TOUCH REJECTED] G28 érintés elutasítva! isHoming = TRUE\n", millis());
                 return 1; 
             }
             
             if (client) {
-                Serial.printf("[%lu ms] [UI TOUCH ACCEPTED] G28 Gomb megnyomva! autoHome() indítása...\n", millis());
                 UIUtils::pressFeedback(_tft, 20, 75, 280, 40, LangManager::get("octo_btn_autohome"), theme.cardBg, theme.text, 2, 5);
                 client->autoHome(); 
                 updatePrepareMenu(client, true);
@@ -527,7 +585,7 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
 
         if (y >= 160 && y <= 195) {
             if (client) {
-                UIUtils::pressFeedback(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), TFT_MAROON, TFT_WHITE, 2, 5);
+                UIUtils::pressFeedback(_tft, 20, 160, 280, 35, LangManager::get("octo_btn_cooldown"), theme.cardBg, theme.text, 2, 5);
                 client->setNozzleTarget(0);
                 client->setBedTarget(0);
             }
@@ -549,7 +607,10 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
             if (x >= 20 && x <= 150) {
                 UIUtils::pressFeedback(_tft, 20, 75, 130, 55, LangManager::get("octo_btn_zoffset"), theme.cardBg, theme.text, 2, 5);
                 _subState = SUB_Z_OFFSET;
-                drawZOffsetMenu();
+                _zHomed = false;
+                _zOffsetDelta = 0.000f;
+                if (client) client->resetZOffsetPrep();
+                drawZOffsetMenu(client);
                 return 1;
             } else if (x >= 170 && x <= 300) {
                 UIUtils::pressFeedback(_tft, 170, 75, 130, 55, LangManager::get("octo_btn_bedmesh"), theme.cardBg, theme.text, 2, 5);
@@ -584,13 +645,13 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
     }
 
     if (_subState == SUB_FILAMENT) {
-        if (y >= 200) { 
-            UIUtils::pressFeedback(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
-            _subState = SUB_MAIN; 
-            drawMainMenu(); 
-            return 1; 
+        int result = _filamentMenu.handleTouch(x, y, client);
+        if (result == 0) {
+            _subState = SUB_MAIN;
+            drawMainMenu();
+            return 1;
         }
-        return -1;
+        return result;
     }
 
     if (_subState == SUB_TUNE) {
@@ -650,41 +711,80 @@ int OctoMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
     }
 
     if (_subState == SUB_Z_OFFSET) {
-        if (y >= 200) { 
-            UIUtils::pressFeedback(_tft, 20, 200, 280, 28, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 5);
-            _subState = SUB_CALIBRATION; 
-            drawCalibrationMenu(); 
-            return 1; 
-        } 
-        if (y >= 75 && y <= 109) { 
-            if (client) {
-                UIUtils::pressFeedback(_tft, 20, 75, 280, 34, LangManager::get("octo_btn_zhome"), theme.cardBg, theme.text, 2, 5);
-                client->homeZ(); 
+        bool isReady = client ? client->isZOffsetReady() : _zHomed;
+        bool isPrepRunning = client ? client->isZOffsetPrepRunning() : false;
+
+        if (!isReady) {
+            if (y >= 200) { 
+                UIUtils::pressFeedback(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
+                _subState = SUB_CALIBRATION; 
+                _zHomed = false; 
+                if (client) client->resetZOffsetPrep();
+                drawCalibrationMenu(); 
+                return 1; 
+            } 
+
+            if (y >= 75 && y <= 115) { 
+                if (client && !isPrepRunning) {
+                    UIUtils::pressFeedback(_tft, 20, 75, 280, 40, "Pozicionalas...", theme.cardBg, theme.text, 2, 5);
+                    client->startZOffsetPrep(); 
+                    _zOffsetDelta = 0.000f;
+                    drawZOffsetMenu(client); 
+                }
+                return 1; 
             }
+
             return 1; 
         }
-        if (y >= 118 && y <= 152) {
-            if (x >= 15 && x <= 70) { 
-                if (client) {
-                    UIUtils::pressFeedback(_tft, 15, 118, 55, 34, "-0.01", theme.cardBg, theme.text, 1, 4);
-                    client->adjustZOffset(-0.01f); 
-                }
-            }
-            if (x >= 250 && x <= 305) { 
-                if (client) {
-                    UIUtils::pressFeedback(_tft, 250, 118, 55, 34, "+0.01", theme.cardBg, theme.text, 1, 4);
-                    client->adjustZOffset(0.01f); 
-                }
+
+        if (y >= 200) { 
+            UIUtils::pressFeedback(_tft, 15, 202, 290, 28, LangManager::get("btn_back"), theme.cardBg, theme.text, 1, 4);
+            _subState = SUB_CALIBRATION; 
+            _zHomed = false; 
+            if (client) client->resetZOffsetPrep();
+            drawCalibrationMenu(); 
+            return 1; 
+        }
+
+        if (y >= 65 && y <= 110 && x >= 15 && x <= 75) {
+            if (client) {
+                UIUtils::pressFeedback(_tft, 15, 65, 60, 45, "-", theme.cardBg, theme.text, 4, 4);
+                client->adjustZOffset(-_zStepSize);
+                _zOffsetDelta -= _zStepSize;
+                drawZOffsetMenu(client);
             }
             return 1;
         }
-        if (y >= 160 && y <= 194) { 
+
+        if (y >= 65 && y <= 110 && x >= 245 && x <= 305) {
             if (client) {
-                UIUtils::pressFeedback(_tft, 20, 160, 280, 34, LangManager::get("octo_btn_save"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
+                UIUtils::pressFeedback(_tft, 245, 65, 60, 45, "+", theme.cardBg, theme.text, 4, 4);
+                client->adjustZOffset(_zStepSize);
+                _zOffsetDelta += _zStepSize;
+                drawZOffsetMenu(client);
+            }
+            return 1;
+        }
+
+        if (y >= 118 && y <= 150) {
+            if (x >= 15 && x <= 79)        { _zStepSize = 0.01f; drawZOffsetMenu(client); return 1; }
+            else if (x >= 89 && x <= 153)  { _zStepSize = 0.05f; drawZOffsetMenu(client); return 1; }
+            else if (x >= 163 && x <= 227) { _zStepSize = 0.10f; drawZOffsetMenu(client); return 1; }
+            else if (x >= 237 && x <= 301) { _zStepSize = 0.50f; drawZOffsetMenu(client); return 1; }
+        }
+
+        if (y >= 158 && y <= 195) { 
+            if (client) {
+                UIUtils::pressFeedback(_tft, 15, 158, 290, 36, "Mentes...", TFT_DARKGREEN, TFT_WHITE, 2, 5);
                 client->saveConfig(); 
+                client->autoHome(); 
+                client->resetZOffsetPrep();
+                _zHomed = false;
+                drawZOffsetMenu(client);
             }
             return 1; 
         }
+
         return -1;
     }
 

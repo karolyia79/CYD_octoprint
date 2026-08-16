@@ -3,6 +3,7 @@
 #include <SD.h>
 #include "lang_manager.h"
 #include "ui_utils.h"
+#include "release.h" // Verzió és kiadási infók bevonása
 
 MenuScreen::MenuScreen(TFT_eSPI* tft, CST820* touch) 
     : _tft(tft), _touch(touch), _currentSubMenu(0), 
@@ -175,11 +176,9 @@ void MenuScreen::drawSystemMenu() {
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->drawString(LangManager::get("system_menu_title"), 160, 15, 2);
     
-    // 2x2 elrendezés (4 menüpont) - Dinamikus szövegekkel
-    drawMenuButton(20, 45, 130, 65, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK);
-    drawMenuButton(170, 45, 130, 65, LangManager::get("system_del_config"), TFT_RED, TFT_WHITE);
-    drawMenuButton(20, 120, 130, 65, LangManager::get("system_format_sd"), TFT_RED, TFT_WHITE);
-    drawMenuButton(170, 120, 130, 65, LangManager::get("system_btn_info"), theme.cardBg, theme.text);
+    // Rendszer menü elrendezés
+    drawMenuButton(20, 60, 280, 48, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK);
+    drawMenuButton(20, 120, 280, 48, LangManager::get("system_btn_info"), theme.cardBg, theme.text);
 
     drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
 }
@@ -192,17 +191,22 @@ void MenuScreen::drawInfoMenu() {
     _tft->setTextColor(theme.text, theme.bg);
     _tft->setTextDatum(ML_DATUM);
 
-    // 1. Szabad memória (Heap)
-    uint32_t freeHeap = ESP.getFreeHeap();
-    _tft->drawString(LangManager::get("info_free_ram") + " " + String(freeHeap / 1024) + " KB", 30, 50, 2);
+    // 1. Szabad RAM / Teljes RAM (KB-ban)
+    uint32_t freeHeap = ESP.getFreeHeap() / 1024;
+    uint32_t totalHeap = ESP.getHeapSize() / 1024;
+    _tft->drawString(LangManager::get("info_free_ram") + " " + String(freeHeap) + " KB / " + String(totalHeap) + " KB", 20, 48, 2);
 
-    // 2. FW Verziószám
-    _tft->drawString(LangManager::get("info_fw_version") + " " + "v1.0.3", 30, 80, 2);
+    // 2. Szabad Flash tárhely / Teljes Flash tárhely (mindkettő KB-ban)
+    uint32_t freeFlash = ESP.getFreeSketchSpace() / 1024;
+    uint32_t totalFlash = ESP.getFlashChipSize() / 1024;
+    String flashStr = "Flash: " + String(freeFlash) + " KB / " + String(totalFlash) + " KB";
+    _tft->drawString(flashStr, 20, 75, 2);
 
-    // 3. OctoPrint verzió (státusz / címke)
-    _tft->drawString(LangManager::get("info_octo_version") + " " + "v1.10.x", 30, 110, 2);
+    // 3. FW Verzió + Build név
+    String fwStr = LangManager::get("info_fw_version") + " " + String(FW_VERSION) + " " + String(FW_BUILD_NAME);
+    _tft->drawString(fwStr, 20, 102, 2);
 
-    // 4. SD kártya fájlok száma és integritás (OK)
+    // 4. SD kártya fájlok száma
     int fileCount = 0;
     File root = SD.open("/");
     if (root) {
@@ -214,8 +218,13 @@ void MenuScreen::drawInfoMenu() {
             file = root.openNextFile();
         }
         root.close();
-    _tft->drawString(LangManager::get("info_sd_files") + " " + String(fileCount) + " db (OK)", 30, 140, 2);
     }
+    _tft->drawString(LangManager::get("info_sd_files") + " " + String(fileCount) + " db (OK)", 20, 129, 2);
+
+    // 5. Release date alul, középre igazítva
+    _tft->setTextDatum(TC_DATUM);
+    _tft->setTextColor(theme.subText, theme.bg);
+    _tft->drawString(String(RELEASE_DATE), 160, 165, 2);
 
     _tft->setTextDatum(MC_DATUM);
     drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
@@ -329,30 +338,16 @@ bool MenuScreen::handleClick(uint16_t x, uint16_t y) {
         }
     }
     else if (_currentSubMenu == 4) {
-        // 2x2 Rendszer menü kattintáskezelés
-        if (y >= 45 && y <= 110) {
-            if (x >= 20 && x <= 150) { 
-                UIUtils::pressFeedback(_tft, 20, 45, 130, 65, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, 2, 6);
-                ESP.restart(); 
-            }
-            else if (x >= 170 && x <= 300) { 
-                UIUtils::pressFeedback(_tft, 170, 45, 130, 65, LangManager::get("system_del_config"), TFT_RED, TFT_WHITE, 2, 6);
-                if (SD.exists("/config.json")) SD.remove("/config.json");
-                ConfigManager::createDefaultConfig();
-                _config = ConfigManager::loadConfig();
-                draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
-            }
-        }
-        else if (y >= 120 && y <= 185) {
-            if (x >= 20 && x <= 150) { 
-                UIUtils::pressFeedback(_tft, 20, 120, 130, 65, LangManager::get("system_format_sd"), TFT_RED, TFT_WHITE, 2, 6);
-                SD.remove("/config.json");
-                SD.remove("/system.log");
-                delay(500);
+        // Rendszer menü (Submenu 4) kattintáskezelése
+        if (x >= 20 && x <= 300) {
+            // Újraindítás gomb (y: 60..108)
+            if (y >= 60 && y <= 108) {
+                UIUtils::pressFeedback(_tft, 20, 60, 280, 48, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, 2, 6);
                 ESP.restart();
             }
-            else if (x >= 170 && x <= 300) { 
-                UIUtils::pressFeedback(_tft, 170, 120, 130, 65, LangManager::get("system_btn_info"), theme.cardBg, theme.text, 2, 6);
+            // Rendszer infó gomb (y: 120..168)
+            else if (y >= 120 && y <= 168) {
+                UIUtils::pressFeedback(_tft, 20, 120, 280, 48, LangManager::get("system_btn_info"), theme.cardBg, theme.text, 2, 6);
                 _currentSubMenu = 5; // Nyitás az Info almenüre
                 _mainMenuButtonsDrawn = false;
                 _tft->fillScreen(theme.bg);

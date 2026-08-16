@@ -4,12 +4,33 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "octo_client.h"
 #include "mqtt_monitor.h"
+
+#define MAX_MESH_SIZE 10
+
+struct OctoPrinterData {
+    String name = "OctoPrint";
+    String status = "Kapcsolódás...";
+    float nozzleTemp = 0;
+    float nozzleTarget = 0;
+    float bedTemp = 0;
+    float bedTarget = 0;
+    int speed = 100;
+    bool mqttActive = false;
+    int progress = 0;
+    String remainingTime = "-";
+    String totalTime;
+    bool connected = false;
+
+    int meshRows = 3;
+    int meshCols = 3;
+    float bedMesh[MAX_MESH_SIZE][MAX_MESH_SIZE] = {0};
+    bool meshLoaded = false;
+};
 
 class OctoClientMqtt {
 public:
-    OctoClientMqtt(OctoClient* baseClient, PubSubClient* mqttClient, MqttMonitor* monitor);
+    OctoClientMqtt(PubSubClient* mqttClient, MqttMonitor* monitor);
 
     bool begin(const String& brokerIp, int port = 1883);
     void update();
@@ -29,6 +50,17 @@ public:
     void setSpeed(int percent);
     void adjustZOffset(float delta);
 
+    // Filament kezelő parancsok
+    void loadFilament(bool isBowden);
+    void unloadFilament(bool isBowden);
+    void extrudeFilament(float lengthMm, float speedMmMin = 300.0f);
+
+    // Z-Offset pozicionálás (G28 -> G1 Z0 F300 -> OK várakozás)
+    void startZOffsetPrep();
+    bool isZOffsetPrepRunning() const { return _zOffsetPrepRunning; }
+    bool isZOffsetReady() const { return _zOffsetReady; }
+    void resetZOffsetPrep() { _zOffsetPrepRunning = false; _zOffsetReady = false; _zOffsetPrepPhase = 0; }
+
     // PID és MPC vezérlés
     void startPidAutotune();
     void startMpcAutotune();
@@ -36,46 +68,68 @@ public:
     bool isPidDone() const { return _pidDone; }
     void clearPidDone() { _pidDone = false; }
 
-    // --- ÚJ: Futási állapotok lekérdezése ---
+    // Futási állapotok lekérdezése
     bool isPidRunning() const { return _pidRunning; }
     bool isMpcRunning() const { return _mpcRunning; }
-    // ----------------------------------------
 
     // Ismeretlen parancs hiba kezelés
     bool hasUnknownCommandError() const { return _unknownCommandError; }
     void clearUnknownCommandError() { _unknownCommandError = false; }
 
-    // Átirányított állapotlekérdezések
-    OctoClient* getBaseClient() const { return _base; }
-    const OctoPrinterData& getData() const { return _base->getData(); }
-    OctoPrinterData& getData() { return _base->getData(); }
+    // Állapotlekérdezések
+    const OctoPrinterData& getData() const { return _data; }
+    OctoPrinterData& getData() { return _data; }
 
-    bool isHoming() const { return _base->isHoming(); }
-    bool isMeshBuilding() const { return _base->isMeshBuilding(); }
-    bool isPluginMissing() const { return _base->isPluginMissing(); }
-    bool supportsCustomMesh() const { return _base->supportsCustomMesh(); }
+    bool isHoming() const { return _isHoming; }
+    void setHoming(bool h) { _isHoming = h; if (h) _homeTimer = millis(); }
 
-    bool shouldShowMeshSavedPopup() const { return _base->shouldShowMeshSavedPopup(); }
-    void dismissMeshSavedPopup() { _base->dismissMeshSavedPopup(); }
+    bool isMeshBuilding() const { return _meshBuildState != 0; }
+    void setMeshBuildState(int state) { _meshBuildState = state; }
 
-    bool shouldShowNoMeshPopup() const { return _base->shouldShowNoMeshPopup(); }
-    void dismissNoMeshPopup() { _base->dismissNoMeshPopup(); }
+    int getMeshPhase() const { return _meshPhase; }
+    void setMeshPhase(int phase) { _meshPhase = phase; }
+
+    bool isPluginMissing() const { return false; }
+    bool supportsCustomMesh() const { return false; }
+
+    // Popup állapotok kezelése
+    bool shouldShowMeshSavedPopup() const { return _showMeshSavedPopup; }
+    void dismissMeshSavedPopup() { _showMeshSavedPopup = false; }
+    void setShowMeshSavedPopup(bool show) { _showMeshSavedPopup = show; }
+
+    bool shouldShowNoMeshPopup() const { return _showNoMeshPopup; }
+    void dismissNoMeshPopup() { _showNoMeshPopup = false; }
+    void setShowNoMeshPopup(bool show) { _showNoMeshPopup = show; }
 
     void fetchBedMesh();
 
 private:
-    OctoClient* _base;
     PubSubClient* _mqtt;
     MqttMonitor* _monitor;
-    
+    OctoPrinterData _data;
+
     bool _mqttActive = false;
+    bool _isHoming = false;
+    uint32_t _homeTimer = 0;
+    int _meshBuildState = 0;
+    int _meshPhase = 0;
+
     bool _busySeen = false;
     bool _pendingClearWatchers = false;
     bool _seenAxisReport = false;
     bool _unknownCommandError = false;
     unsigned long _cmdStartTime = 0;
     unsigned long _lastBusyTime = 0;
-    
+
+    // Belső popup állapotok
+    bool _showMeshSavedPopup = false;
+    bool _showNoMeshPopup = false;
+
+    // Z-Offset előkészítési állapotok
+    bool _zOffsetPrepRunning = false;
+    bool _zOffsetReady = false;
+    int _zOffsetPrepPhase = 0;
+
     // PID és MPC belső állapotok
     bool _pidRunning = false;
     bool _mpcRunning = false;

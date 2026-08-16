@@ -18,7 +18,7 @@ public:
     static WiFiState getState();
     static uint16_t getStatusColor();
     
-    // Új: Kompakt Wi-Fi ikon kirajzolása a megadott (x, y) koordinátára
+    // Kompakt Wi-Fi ikon kirajzolása a megadott (x, y) koordinátára
     static void drawIcon(TFT_eSPI* tft, int x, int y);
 };
 

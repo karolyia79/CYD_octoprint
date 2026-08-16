@@ -3,8 +3,8 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
-OctoClientMqtt::OctoClientMqtt(OctoClient* baseClient, PubSubClient* mqttClient, MqttMonitor* monitor) 
-    : _base(baseClient), _mqtt(mqttClient), _monitor(monitor) {}
+OctoClientMqtt::OctoClientMqtt(PubSubClient* mqttClient, MqttMonitor* monitor) 
+    : _mqtt(mqttClient), _monitor(monitor) {}
 
 bool OctoClientMqtt::begin(const String& brokerIp, int port) {
     _brokerIp = brokerIp;
@@ -30,7 +30,6 @@ bool OctoClientMqtt::begin(const String& brokerIp, int port) {
             this->parseJsonMessage(tStr, msg);
         }
 
-        Serial.printf("[%lu ms] [MQTT INCOMING] Topic: %s | Msg: %s\n", millis(), topic, msg.c_str());
         if (this->_monitor) {
             this->_monitor->processMessage(tStr, msg);
         }
@@ -41,6 +40,8 @@ bool OctoClientMqtt::begin(const String& brokerIp, int port) {
     Serial.println(LangManager::get("mqtt_conn_to_broker") + _brokerIp + ":" + String(_port));
     if (_mqtt->connect(clientId.c_str())) {
         _mqttActive = true;
+        _data.mqttActive = true;
+        _data.connected = true;
         _mqtt->subscribe("octoprint/serial/#");
         _mqtt->subscribe("octoprint/temperature/#");
         _mqtt->subscribe("octoprint/printer/state");
@@ -48,10 +49,11 @@ bool OctoClientMqtt::begin(const String& brokerIp, int port) {
         Serial.println(LangManager::get("mqtt_success_active"));
     } else {
         _mqttActive = false;
+        _data.mqttActive = false;
+        _data.connected = false;
         Serial.printf("%s %d\n", LangManager::get("mqtt_err_failed_code").c_str(), _mqtt->state());
     }
     
-    _base->setMqttActive(_mqttActive);
     return _mqttActive;
 }
 
@@ -61,21 +63,21 @@ void OctoClientMqtt::parseJsonMessage(const String& topic, const String& payload
     if (error) return;
 
     if (topic.indexOf("temperature/tool0") != -1) {
-        if (doc.containsKey("actual")) _base->getData().nozzleTemp = doc["actual"];
-        if (doc.containsKey("target")) _base->getData().nozzleTarget = doc["target"];
+        if (doc.containsKey("actual")) _data.nozzleTemp = doc["actual"];
+        if (doc.containsKey("target")) _data.nozzleTarget = doc["target"];
     } else if (topic.indexOf("temperature/bed") != -1) {
-        if (doc.containsKey("actual")) _base->getData().bedTemp = doc["actual"];
-        if (doc.containsKey("target")) _base->getData().bedTarget = doc["target"];
+        if (doc.containsKey("actual")) _data.bedTemp = doc["actual"];
+        if (doc.containsKey("target")) _data.bedTarget = doc["target"];
     } else if (topic.indexOf("printer/state") != -1) {
         if (doc.containsKey("text")) {
             String stateText = doc["text"].as<String>();
-            if (!_base->isHoming() && !_base->isMeshBuilding() && !_pidRunning && !_mpcRunning) {
-                _base->getData().status = stateText;
+            if (!_isHoming && !_meshBuildState && !_pidRunning && !_mpcRunning) {
+                _data.status = stateText;
             }
         }
     } else if (topic.indexOf("progress/print") != -1) {
         if (doc.containsKey("progress")) {
-            _base->getData().progress = doc["progress"];
+            _data.progress = doc["progress"];
         }
     }
 }
@@ -98,12 +100,12 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
         if (slashPos != -1) {
             String actualStr = msg.substring(tPos + 2, slashPos);
             actualStr.trim();
-            _base->getData().nozzleTemp = actualStr.toFloat();
+            _data.nozzleTemp = actualStr.toFloat();
             
             int spacePos = msg.indexOf(' ', slashPos);
             String targetStr = (spacePos != -1) ? msg.substring(slashPos + 1, spacePos) : msg.substring(slashPos + 1);
             targetStr.trim();
-            _base->getData().nozzleTarget = targetStr.toFloat();
+            _data.nozzleTarget = targetStr.toFloat();
         }
     }
     
@@ -113,12 +115,12 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
         if (slashPos != -1) {
             String actualStr = msg.substring(bPos + 2, slashPos);
             actualStr.trim();
-            _base->getData().bedTemp = actualStr.toFloat();
+            _data.bedTemp = actualStr.toFloat();
             
             int spacePos = msg.indexOf(' ', slashPos);
             String targetStr = (spacePos != -1) ? msg.substring(slashPos + 1, spacePos) : msg.substring(slashPos + 1);
             targetStr.trim();
-            _base->getData().bedTarget = targetStr.toFloat();
+            _data.bedTarget = targetStr.toFloat();
         }
     }
 
@@ -126,8 +128,9 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
     bool isG29Command = (msg.indexOf("G29") != -1 && (msg.indexOf("Send:") != -1 || msg.indexOf("echo:") != -1 || msg.indexOf("N") != -1 || msg.indexOf("G29") == 0));
 
     if (isG28Command) {
-        if (!_base->isHoming()) {
-            _base->setHoming(true);
+        if (!_isHoming) {
+            Serial.printf("[%lu ms] [PARSER] G28 visszahang erkezett! setHoming(true)\n", millis());
+            setHoming(true);
             _seenAxisReport = false;
             _cmdStartTime = millis();
             _lastBusyTime = millis();
@@ -135,54 +138,54 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
     }
     
     if (isG29Command) {
-        if (!_base->isMeshBuilding()) {
-            _base->setMeshBuildState(3);
-            _base->setMeshPhase(1);
+        if (!isMeshBuilding()) {
+            Serial.printf("[%lu ms] [PARSER WARNING] külső G29 visszahang! setMeshBuildState(3), Phase(1)\n", millis());
+            setMeshBuildState(3);
+            setMeshPhase(1);
             _cmdStartTime = millis();
         }
     }
 
-    if (_base->isHoming() && msg.indexOf("X:") != -1 && msg.indexOf("Count") != -1) {
+    if (_isHoming && msg.indexOf("X:") != -1 && msg.indexOf("Count") != -1) {
         _seenAxisReport = true;
     }
 
     bool isTempPollLine = (msg.indexOf("T:") != -1 && msg.indexOf("B:") != -1);
 
-    if (_base->isHoming()) {
+    if (_isHoming) {
         if (msg.indexOf("ok") != -1 && !isTempPollLine) {
             bool timeoutReached = (millis() - _cmdStartTime > 15000);
             if (_seenAxisReport || timeoutReached) {
-                _base->setHoming(false);
+                setHoming(false);
                 _seenAxisReport = false;
             }
         }
     }
 
-    if (_base->isHoming()) {
-        _base->getData().status = "Homing";
-    } else if (_base->isMeshBuilding()) {
-        _base->getData().status = "Mesh Building";
+    if (_isHoming) {
+        _data.status = "Homing";
+    } else if (isMeshBuilding()) {
+        _data.status = "Mesh Building";
     } else if (_pidRunning) {
-        _base->getData().status = "PID Autotune running";
+        _data.status = "PID Autotune running";
     } else if (_mpcRunning) {
-        _base->getData().status = "MPC Autotune running";
+        _data.status = "MPC Autotune running";
     } else {
         if (msg.indexOf("busy: processing") != -1) {
-            _base->getData().status = "Working";
+            _data.status = "Working";
         }
     }
 }
 
 void OctoClientMqtt::update() {
-    // Státusz védelme külső/HTTP/JSON felülírások ellen kalibráció alatt
     if (_pidRunning) {
-        _base->getData().status = "PID Autotune running";
+        _data.status = "PID Autotune running";
     } else if (_mpcRunning) {
-        _base->getData().status = "MPC Autotune running";
+        _data.status = "MPC Autotune running";
     }
 
     if (_pendingClearWatchers) {
-        Serial.printf("[%lu ms] [MQTT TRACE] Watcherek törlése (_pendingClearWatchers = true)\n", millis());
+        Serial.printf("[%lu ms] [MQTT TRACE] Watcherek torlese (_pendingClearWatchers = true)\n", millis());
         _pendingClearWatchers = false;
         if (_monitor) _monitor->clearWatchers();
     }
@@ -190,7 +193,8 @@ void OctoClientMqtt::update() {
     if (WiFi.status() == WL_CONNECTED) {
         if (!_mqtt->connected()) {
             _mqttActive = false;
-            _base->setMqttActive(false);
+            _data.mqttActive = false;
+            _data.connected = false;
             
             if (millis() - _lastReconnectAttempt > 5000) {
                 _lastReconnectAttempt = millis();
@@ -202,59 +206,87 @@ void OctoClientMqtt::update() {
                     _mqtt->subscribe("octoprint/printer/state");
                     _mqtt->subscribe("octoprint/progress/print");
                     _mqttActive = true;
-                    _base->setMqttActive(true);
+                    _data.mqttActive = true;
+                    _data.connected = true;
                     Serial.println(LangManager::get("mqtt_reconnected_http_off"));
                 }
             }
-
-            static unsigned long lastHttpCheck = 0;
-            if (millis() - lastHttpCheck > 1000) {
-                lastHttpCheck = millis();
-                _base->update();
-            }
-
         } else {
+            _mqttActive = true;
+            _data.mqttActive = true;
+            _data.connected = true;
             _mqtt->loop();
         }
-
     } else {
         _mqttActive = false;
-        _base->setMqttActive(false);
+        _data.mqttActive = false;
+        _data.connected = false;
     }
 
-    if (isConnected() && _base->isMeshBuilding() && _base->getMeshPhase() == 2) {
-        if (_base->getData().bedTemp >= 59.0f || (_base->getData().bedTarget > 0 && _base->getData().bedTemp >= _base->getData().bedTarget - 1.0f)) {
-            _base->setMeshPhase(3);
-            int size = _base->isMeshBuilding();
-            Serial.printf("[%lu ms] [MQTT MESH] Bed elerte a 60 fokot! G29 inditasa MQTT-n...\n", millis());
+    // --- BED MESH FÁZIS-3 -> FÁZIS-4 DIAGNOSZTIKUS VEZÉRLŐ ---
+    if (isConnected() && isMeshBuilding() && getMeshPhase() == 2) {
+        if (_data.bedTemp >= 59.0f || (_data.bedTarget > 0 && _data.bedTemp >= _data.bedTarget - 1.0f)) {
+            setMeshPhase(3);
+            int size = _meshBuildState;
+            Serial.printf("\n==================================================\n");
+            Serial.printf("[%lu ms] [DIAG MESH] BED ELÉRTE A 60 FOKOT! G29 INDÍTÁSA MQTT-N...\n", millis());
+            Serial.printf("==================================================\n");
 
             _monitor->clearWatchers();
-            _busySeen = false;
-            _lastBusyTime = 0;
             _cmdStartTime = millis();
 
-            _monitor->watchFor("busy: processing", [this](const String& msg) {
-                this->_busySeen = true;
-                this->_lastBusyTime = millis();
-            });
+            static bool meshReportSeen = false;
+            meshReportSeen = false;
 
-            _monitor->watchFor("Recv: ok", [this](const String& msg) {
-                bool busyFinished = this->_busySeen && (millis() - this->_lastBusyTime > 1200);
-                bool fallbackTimeout = !this->_busySeen && (millis() - this->_cmdStartTime > 15000);
+            _monitor->watchFor("ok", [this](const String& msg) {
+                int currentPhase = this->getMeshPhase();
+                Serial.printf("[%lu ms] [DIAG WATCHER 'ok'] Msg: '%s' | Phase: %d | meshReportSeen: %d\n", 
+                              millis(), msg.c_str(), currentPhase, meshReportSeen);
 
-                if (this->_base->getMeshPhase() == 3) {
-                    if (busyFinished || fallbackTimeout) {
-                        Serial.printf("[%lu ms] [MQTT RX] G29 kész! M500 (mentés) indítása...\n", millis());
-                        this->_base->setMeshPhase(4);
+                if (msg.indexOf("T:") != -1 || msg.indexOf("B:") != -1) {
+                    Serial.printf("[%lu ms] [DIAG WATCHER] -> KISZŰRVE (Hőmérséklet lekérdezés volt)\n", millis());
+                    return;
+                }
+
+                if (msg.indexOf("X:") != -1 || msg.indexOf("Grid") != -1 || msg.indexOf("Mesh") != -1 || msg.indexOf("Count") != -1) {
+                    meshReportSeen = true;
+                    Serial.printf("[%lu ms] [DIAG WATCHER] -> POZÍCIÓ / MÁTRIX JELENTÉS ÉSZTVE! meshReportSeen = true\n", millis());
+                    return;
+                }
+
+                if (currentPhase == 3) {
+                    bool timeout = (millis() - this->_cmdStartTime > 60000);
+                    Serial.printf("[%lu ms] [DIAG Phase 3 Check] meshReportSeen=%d, timeout=%d\n", millis(), meshReportSeen, timeout);
+                    
+                    if (meshReportSeen || timeout) {
+                        Serial.printf("\n--------------------------------------------------\n");
+                        Serial.printf("[%lu ms] [DIAG Phase 3 -> Phase 4] G29 OK MEEGÉRKEZETT! M500 KÜLDÉSE...\n", millis());
+                        Serial.printf("--------------------------------------------------\n");
+                        
+                        this->setMeshPhase(4);
                         this->sendGcodeCommand("M500");
+                        meshReportSeen = false;
+                    } else {
+                        Serial.printf("[%lu ms] [DIAG Phase 3] Még NEM volt pozíciójelentés, 'ok' figyelmen kívül hagyva.\n", millis());
                     }
                 } 
-                else if (this->_base->getMeshPhase() == 4) {
-                    Serial.printf("[%lu ms] [MQTT RX] M500 mentés kész! Cooldown indítása és feloldás.\n", millis());
-                    this->_base->setMeshBuildState(0);
-                    this->_base->setMeshPhase(0);
+                else if (currentPhase == 4) {
+                    Serial.printf("\n==================================================\n");
+                    Serial.printf("[%lu ms] [DIAG Phase 4 LEZÁRÁS] M500 OK MEGERKEZETT! MÉRÉS SIKERESEN KÉSZ!\n", millis());
+                    Serial.printf("==================================================\n");
+                    
+                    this->setMeshBuildState(0);
+                    this->setMeshPhase(0);
+                    
+                    this->setShowMeshSavedPopup(true);
+
+                    this->sendGcodeCommand("M140 S0");
+                    this->sendGcodeCommand("M104 S0");
+
+                    this->_data.bedTarget = 0;
+                    this->_data.nozzleTarget = 0;
+
                     this->_pendingClearWatchers = true;
-                    this->setBedTarget(0);
                 }
             });
 
@@ -275,10 +307,91 @@ void OctoClientMqtt::sendGcodeCommand(const String& gcode) {
     if (isConnected()) {
         Serial.printf("[%lu ms] [MQTT TX] %s\n", millis(), gcode.c_str());
         _mqtt->publish("octoprint/serial/command", gcode.c_str());
-    } else {
-        Serial.printf("[%lu ms] [HTTP FALLBACK TX] %s\n", millis(), gcode.c_str());
-        _base->sendGcodeCommand(gcode); 
     }
+}
+
+void OctoClientMqtt::extrudeFilament(float lengthMm, float speedMmMin) {
+    sendGcodeCommand("G91");
+    sendGcodeCommand("G1 E" + String(lengthMm, 1) + " F" + String((int)speedMmMin));
+    sendGcodeCommand("G90");
+}
+
+void OctoClientMqtt::loadFilament(bool isBowden) {
+    sendGcodeCommand("G91");
+    if (isBowden) {
+        sendGcodeCommand("G1 E380 F1200");
+        sendGcodeCommand("G1 E20 F100");
+    } else {
+        sendGcodeCommand("G1 E40 F300");
+        sendGcodeCommand("G1 E10 F100");
+    }
+    sendGcodeCommand("G90");
+}
+
+void OctoClientMqtt::unloadFilament(bool isBowden) {
+    sendGcodeCommand("G91");
+    sendGcodeCommand("G1 E2 F100");
+    if (isBowden) {
+        sendGcodeCommand("G1 E-420 F1800");
+    } else {
+        sendGcodeCommand("G1 E-50 F1200");
+    }
+    sendGcodeCommand("G90");
+}
+
+void OctoClientMqtt::startZOffsetPrep() {
+    if (!isConnected()) {
+        _zOffsetPrepRunning = false;
+        _zOffsetReady = true;
+        _zOffsetPrepPhase = 0;
+        return;
+    }
+
+    _zOffsetPrepRunning = true;
+    _zOffsetReady = false;
+    _zOffsetPrepPhase = 1;
+    setHoming(true);
+    _pendingClearWatchers = false;
+    _monitor->clearWatchers();
+
+    _cmdStartTime = millis();
+    _lastBusyTime = 0;
+    _busySeen = false;
+
+    _monitor->watchFor("busy: processing", [this](const String& msg) {
+        this->_busySeen = true;
+        this->_lastBusyTime = millis();
+    });
+
+    _monitor->watchFor("ok", [this](const String& msg) {
+        if (!this->_zOffsetPrepRunning) return;
+        if (msg.indexOf("T:") != -1 || msg.indexOf("B:") != -1) return;
+
+        bool busyFinished = this->_busySeen && (millis() - this->_lastBusyTime > 1000);
+        bool fallbackTimeout = (millis() - this->_cmdStartTime > 15000);
+
+        if (this->_zOffsetPrepPhase == 1) {
+            if (busyFinished || fallbackTimeout || !this->_busySeen) {
+                this->_zOffsetPrepPhase = 2;
+                this->setHoming(false);
+                this->_busySeen = false;
+                this->_lastBusyTime = 0;
+                this->_cmdStartTime = millis();
+                Serial.printf("[%lu ms] [MQTT Z-OFFSET PREP] G28 ok! G1 Z0 F300 kuldese...\n", millis());
+                this->sendGcodeCommand("G1 Z0 F300");
+            }
+        } else if (this->_zOffsetPrepPhase == 2) {
+            if (busyFinished || fallbackTimeout || !this->_busySeen) {
+                Serial.printf("[%lu ms] [MQTT Z-OFFSET PREP] G1 Z0 F300 ok! Kesz, offset allithato.\n", millis());
+                this->_zOffsetPrepRunning = false;
+                this->_zOffsetReady = true;
+                this->_zOffsetPrepPhase = 0;
+                this->_pendingClearWatchers = true;
+            }
+        }
+    });
+
+    sendGcodeCommand("G28");
 }
 
 void OctoClientMqtt::startPidAutotune() {
@@ -291,14 +404,12 @@ void OctoClientMqtt::startPidAutotune() {
     _pidKi = 0.0f; 
     _pidKd = 0.0f;
 
-    // --- NVS: Kalibrációs flag beállítása (Indítás) ---
     Preferences prefs;
     prefs.begin("octoklip", false);
     prefs.putBool("calib_active", true);
     prefs.end();
-    // --------------------------------------------------
 
-    _base->getData().status = "PID Autotune running";
+    _data.status = "PID Autotune running";
     
     _pendingClearWatchers = false;
     _monitor->clearWatchers();
@@ -325,8 +436,9 @@ void OctoClientMqtt::startPidAutotune() {
         }
     });
 
-    _monitor->watchFor("Recv: ok", [this](const String& msg) {
+    _monitor->watchFor("ok", [this](const String& msg) {
         if (!this->_pidRunning) return;
+        if (msg.indexOf("T:") != -1 || msg.indexOf("B:") != -1) return;
 
         if (this->_pidPhase == 1 && this->_pidKp > 0 && this->_pidKi > 0 && this->_pidKd > 0) {
             Serial.printf("[MQTT PID] P:%.2f I:%.2f D:%.2f - M301 kuldese...\n", this->_pidKp, this->_pidKi, this->_pidKd);
@@ -344,14 +456,12 @@ void OctoClientMqtt::startPidAutotune() {
             this->_pidRunning = false;
             this->_pidDone = true;
 
-            // --- NVS: Kalibrációs flag törlése (Siker) ---
             Preferences prefs;
             prefs.begin("octoklip", false);
             prefs.putBool("calib_active", false);
             prefs.end();
-            // ---------------------------------------------
 
-            this->_base->getData().status = "Online";
+            this->_data.status = "Online";
             this->_pendingClearWatchers = true;
         }
     });
@@ -364,14 +474,12 @@ void OctoClientMqtt::startMpcAutotune() {
     if (!isConnected()) return;
     _mpcRunning = true;
 
-    // --- NVS: Kalibrációs flag beállítása (Indítás) ---
     Preferences prefs;
     prefs.begin("octoklip", false);
     prefs.putBool("calib_active", true);
     prefs.end();
-    // --------------------------------------------------
 
-    _base->getData().status = "MPC Autotune running";
+    _data.status = "MPC Autotune running";
     sendGcodeCommand("M306 T");
 }
 
@@ -380,21 +488,19 @@ void OctoClientMqtt::stopCalibration() {
     _mpcRunning = false;
     _pidDone = false;
 
-    // --- NVS: Kalibrációs flag törlése (Megszakítva) ---
     Preferences prefs;
     prefs.begin("octoklip", false);
     prefs.putBool("calib_active", false);
     prefs.end();
-    // ---------------------------------------------------
 
-    _base->getData().status = "Online";
+    _data.status = "Online";
     _pendingClearWatchers = true;
 }
 
 void OctoClientMqtt::autoHome() {
     if (isConnected()) {
-        Serial.printf("[%lu ms] [MQTT EXEC] Auto Home (G28) inditasa MQTT-n! _base->setHoming(true)\n", millis());
-        _base->setHoming(true);
+        Serial.printf("[%lu ms] [MQTT EXEC] Auto Home (G28) inditasa MQTT-n!\n", millis());
+        setHoming(true);
         
         _pendingClearWatchers = false;
         _monitor->clearWatchers();
@@ -409,43 +515,41 @@ void OctoClientMqtt::autoHome() {
         });
 
         _monitor->watchFor("X:", [this](const String& msg) {
-            bool matches = this->_base->isHoming() && (msg.indexOf("Y:") != -1 || msg.indexOf("Count") != -1);
+            bool matches = this->_isHoming && (msg.indexOf("Y:") != -1 || msg.indexOf("Count") != -1);
             if (matches) {
                 Serial.printf("[%lu ms] [MQTT MATCH G28 POS] Pozíciójelentés megérkezett! -> setHoming(false)\n", millis());
-                this->_base->setHoming(false);
+                this->setHoming(false);
                 this->_pendingClearWatchers = true;
             }
         });
 
-        _monitor->watchFor("Recv: ok", [this](const String& msg) {
-            bool currentHoming = this->_base->isHoming();
+        _monitor->watchFor("ok", [this](const String& msg) {
+            bool currentHoming = this->_isHoming;
+            if (!currentHoming) return;
+            if (msg.indexOf("T:") != -1 || msg.indexOf("B:") != -1) return;
+
             bool busyFinished = this->_busySeen && (millis() - this->_lastBusyTime > 1200);
             bool fallbackTimeout = !this->_busySeen && (millis() - this->_cmdStartTime > 12000);
 
-            if (!currentHoming) return;
-
             if (busyFinished || fallbackTimeout) {
                 Serial.printf("[%lu ms] [MQTT MATCH G28 OK] Lezáró 'ok' elfogadva! -> setHoming(false)\n", millis());
-                this->_base->setHoming(false);
+                this->setHoming(false);
                 this->_pendingClearWatchers = true;
             }
         });
 
         sendGcodeCommand("G28");
-    } else {
-        _base->autoHome();
     }
 }
 
 void OctoClientMqtt::disableSteppers() {
-    if (isConnected()) sendGcodeCommand("M84");
-    else _base->disableSteppers();
+    sendGcodeCommand("M84");
 }
 
 void OctoClientMqtt::homeZ() {
     if (isConnected()) {
-        Serial.printf("[%lu ms] [MQTT EXEC] Z Home (G28 Z) inditasa MQTT-n! _base->setHoming(true)\n", millis());
-        _base->setHoming(true);
+        Serial.printf("[%lu ms] [MQTT EXEC] Z Home (G28 Z) inditasa MQTT-n!\n", millis());
+        setHoming(true);
 
         _pendingClearWatchers = false;
         _monitor->clearWatchers();
@@ -460,96 +564,73 @@ void OctoClientMqtt::homeZ() {
         });
 
         _monitor->watchFor("Z:", [this](const String& msg) {
-            bool matches = this->_base->isHoming() && (msg.indexOf("Count") != -1 || msg.indexOf("E:") != -1);
+            bool matches = this->_isHoming && (msg.indexOf("Count") != -1 || msg.indexOf("E:") != -1);
             if (matches) {
                 Serial.printf("[%lu ms] [MQTT MATCH G28 Z POS] Pozíciójelentés megérkezett! -> setHoming(false)\n", millis());
-                this->_base->setHoming(false);
+                this->setHoming(false);
                 this->_pendingClearWatchers = true;
             }
         });
 
-        _monitor->watchFor("Recv: ok", [this](const String& msg) {
-            bool currentHoming = this->_base->isHoming();
+        _monitor->watchFor("ok", [this](const String& msg) {
+            bool currentHoming = this->_isHoming;
+            if (!currentHoming) return;
+            if (msg.indexOf("T:") != -1 || msg.indexOf("B:") != -1) return;
+
             bool busyFinished = this->_busySeen && (millis() - this->_lastBusyTime > 1200);
             bool fallbackTimeout = !this->_busySeen && (millis() - this->_cmdStartTime > 8000);
 
-            if (!currentHoming) return;
-
             if (busyFinished || fallbackTimeout) {
                 Serial.printf("[%lu ms] [MQTT MATCH G28 Z OK] Lezáró 'ok' elfogadva! -> setHoming(false)\n", millis());
-                this->_base->setHoming(false);
+                this->setHoming(false);
                 this->_pendingClearWatchers = true;
             }
         });
 
         sendGcodeCommand("G28 Z");
-    } else {
-        _base->homeZ();
     }
 }
 
 void OctoClientMqtt::saveConfig() {
-    if (isConnected()) sendGcodeCommand("M500");
-    else _base->saveConfig();
+    sendGcodeCommand("M500");
 }
 
 void OctoClientMqtt::setNozzleTarget(float temp) {
-    if (isConnected()) sendGcodeCommand("M104 S" + String((int)temp));
-    else _base->setNozzleTarget(temp);
+    _data.nozzleTarget = temp;
+    sendGcodeCommand("M104 S" + String((int)temp));
 }
 
 void OctoClientMqtt::setBedTarget(float temp) {
-    if (isConnected()) sendGcodeCommand("M140 S" + String((int)temp));
-    else _base->setBedTarget(temp);
+    _data.bedTarget = temp;
+    sendGcodeCommand("M140 S" + String((int)temp));
 }
 
 void OctoClientMqtt::setSpeed(int percent) {
-    if (isConnected()) sendGcodeCommand("M220 S" + String(percent));
-    else _base->setSpeed(percent);
+    _data.speed = percent;
+    sendGcodeCommand("M220 S" + String(percent));
 }
 
 void OctoClientMqtt::adjustZOffset(float delta) {
-    if (isConnected()) sendGcodeCommand("M290 Z" + String(delta, 3));
-    else _base->adjustZOffset(delta);
+    sendGcodeCommand("M290 Z" + String(delta, 3));
 }
 
 void OctoClientMqtt::autoBuildMesh(int size) {
-    if (!isConnected()) {
-        _base->autoBuildMesh(size);
-        return;
-    }
+    if (!isConnected()) return;
 
-    _base->setMeshBuildState(size);
-    _base->setMeshPhase(1);
+    setMeshBuildState(size);
+    setMeshPhase(1);
     
     _pendingClearWatchers = false;
     _monitor->clearWatchers();
 
     _cmdStartTime = millis();
-    _lastBusyTime = 0;
-    _busySeen = false;
 
-    _monitor->watchFor("busy: processing", [this](const String& msg) {
-        this->_busySeen = true;
-        this->_lastBusyTime = millis();
-    });
+    _monitor->watchFor("ok", [this](const String& msg) {
+        if (msg.indexOf("T:") != -1 || msg.indexOf("B:") != -1) return;
 
-    _monitor->watchFor("X:", [this](const String& msg) {
-        if (this->_base->getMeshPhase() == 1 && (msg.indexOf("Y:") != -1 || msg.indexOf("Count") != -1)) {
-            this->_base->setMeshPhase(2);
-            this->setBedTarget(60);
-            this->_pendingClearWatchers = true;
-        }
-    });
-
-    _monitor->watchFor("Recv: ok", [this](const String& msg) {
-        if (this->_base->getMeshPhase() != 1) return;
-
-        bool busyFinished = this->_busySeen && (millis() - this->_lastBusyTime > 1200);
-        bool fallbackTimeout = !this->_busySeen && (millis() - this->_cmdStartTime > 12000);
-
-        if (busyFinished || fallbackTimeout) {
-            this->_base->setMeshPhase(2);
+        if (this->getMeshPhase() == 1) {
+            Serial.printf("[%lu ms] [MQTT MESH Phase 1] G28 ok megerkezett! Bed heating (60C)...\n", millis());
+            this->setMeshPhase(2);
             this->setBedTarget(60);
             this->_pendingClearWatchers = true;
         }
@@ -559,12 +640,9 @@ void OctoClientMqtt::autoBuildMesh(int size) {
 }
 
 void OctoClientMqtt::fetchBedMesh() {
-    if (!isConnected()) {
-        _base->fetchBedMesh();
-        return;
-    }
+    if (!isConnected()) return;
 
-    _base->getData().meshLoaded = false;
+    _data.meshLoaded = false;
     
     static int parsedRows = 0;
     static bool gridStarted = false;
@@ -585,13 +663,13 @@ void OctoClientMqtt::fetchBedMesh() {
 
         if (line.startsWith("echo:") || line.startsWith("ok") || line.length() == 0) {
             if (parsedRows > 0) {
-                _base->getData().meshRows = parsedRows;
-                _base->getData().meshCols = parsedRows;
-                _base->getData().meshLoaded = true;
-                _base->setShowNoMeshPopup(false);
+                _data.meshRows = parsedRows;
+                _data.meshCols = parsedRows;
+                _data.meshLoaded = true;
+                setShowNoMeshPopup(false);
             } else {
-                _base->getData().meshLoaded = true;
-                _base->setShowNoMeshPopup(true);
+                _data.meshLoaded = true;
+                setShowNoMeshPopup(true);
             }
             gridStarted = false;
             return;
@@ -613,7 +691,7 @@ void OctoClientMqtt::fetchBedMesh() {
                     isRowIndexParsed = true;
                 } else {
                     if (parsedRows < MAX_MESH_SIZE && colIndex < MAX_MESH_SIZE) {
-                        _base->getData().bedMesh[parsedRows][colIndex] = token.toFloat();
+                        _data.bedMesh[parsedRows][colIndex] = token.toFloat();
                     }
                     colIndex++;
                 }
