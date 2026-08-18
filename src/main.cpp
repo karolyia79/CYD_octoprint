@@ -6,6 +6,7 @@
 #include "klipper_client.h"
 #include "octo_client_mqtt.h"
 #include "mqtt_monitor.h"
+#include "rgb_led.h"
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <CST820.h>
@@ -16,6 +17,7 @@ CST820 touch(33, 32, -1, 4);
 
 SplashScreen splash(&tft);
 APManager apManager(&splash);
+RgbLed rgbLed;
 
 bool isOctoEnabled = false;
 bool isKlipperEnabled = false;
@@ -34,6 +36,18 @@ const unsigned long KLIPPER_UPDATE_INTERVAL = 5000;
 
 TaskHandle_t NetworkTask = nullptr;
 
+// Kijelző alvás és fényerő kezelő változók
+unsigned long lastActivityTime = 0;
+bool isScreenAsleep = false;
+
+void setBacklightBrightness(int percent) {
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+    int duty = map(percent, 0, 100, 0, 255);
+    ledcAttach(27, 5000, 8);
+    ledcWrite(27, duty);
+}
+
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
     String msg;
     for (unsigned int i = 0; i < length; i++) {
@@ -50,8 +64,18 @@ void networkTaskCode(void * pvParameters) {
         if (octoMqtt) {
             octoMqtt->update();
         }
+        
+        bool isWifiOk = (WiFi.status() == WL_CONNECTED);
+        bool isMqttOk = octoMqtt ? octoMqtt->isConnected() : false;
+        bool isApiOk  = octoMqtt ? octoMqtt->getData().apiConnected : false;
+        bool printing = octoMqtt ? octoMqtt->getData().printingActive : false;
+        bool paused   = octoMqtt ? (octoMqtt->getData().status == "Paused" || octoMqtt->getData().status == "Szüneteltetve") : false;
+        bool heating  = octoMqtt ? (octoMqtt->getData().nozzleTarget > 0 && octoMqtt->getData().nozzleTemp < octoMqtt->getData().nozzleTarget - 2.0f) : false;
+        bool homing   = octoMqtt ? octoMqtt->isHoming() : false;
+        bool mesh     = octoMqtt ? octoMqtt->isMeshBuilding() : false;
 
-        // Klipper HTTP frissítés (ha engedélyezve van)
+        rgbLed.updateStatus(isWifiOk, isMqttOk, isApiOk, printing, paused, heating, homing, mesh, false);
+        
         if (millis() - lastKlipperUpdate > KLIPPER_UPDATE_INTERVAL) {
             if (isKlipperEnabled && klipperClient) {
                 klipperClient->update();
@@ -68,6 +92,7 @@ AppState currentState = STATE_MAIN;
 void setup() {
     Serial.begin(115200);
     delay(200);
+    rgbLed.init();
 
     Serial.println("\n==============================================");
     Serial.println("       OCTOKLIPSCREEN BOOT INDITASA           ");
@@ -91,12 +116,17 @@ void setup() {
     bool sdSuccess = ConfigManager::init();
     PrinterConfig cfg = ConfigManager::loadConfig(); 
 
+    // Mentett LED állapot, fényerő és alvási időzítő inicializálása
+    rgbLed.setEnabled(cfg.led_enabled);
+    setBacklightBrightness(cfg.screen_brightness);
+    lastActivityTime = millis();
+
     if (!sdSuccess) {
         Serial.println("[BOOT ERROR] SD Card / Config initialization failed!");
-        splash.showMessage("SD Card Error!", TFT_RED);
+        splash.showMessage(LangManager::get("sys_sd_error"), TFT_RED);
         delay(1000);
     } else {
-        splash.showMessage("System Init...", TFT_WHITE);
+        splash.showMessage(LangManager::get("sys_init"), TFT_WHITE);
         splash.drawProgressBar(20);
     }
 
@@ -116,6 +146,9 @@ void setup() {
 
     mqttClient.setCallback(mqttCallback);
     octoMqtt = new OctoClientMqtt(&mqttClient, &mqttMonitor);
+    
+    // REST API konfiguráció átadása
+    octoMqtt->setApiConfig(cfg.octo_ip, cfg.octo_key);
 
     mainScreen = new MainScreen(&tft, &touch, isOctoEnabled, isKlipperEnabled, octoMqtt);
     menuScreen = new MenuScreen(&tft, &touch); 
@@ -221,16 +254,52 @@ void setup() {
 void loop() {
     apManager.handleClient();
 
+    PrinterConfig cfg = ConfigManager::loadConfig();
+
+    uint16_t touchX = 0, touchY = 0;
+    uint8_t touchGesture = 0;
+    bool touched = touch.getTouch(&touchX, &touchY, &touchGesture);
+
+    // Képernyő érintés észlelése bárhol a kijelzőn -> Aktivitási idő frissítése / Ébresztés
+    if (touched) {
+        lastActivityTime = millis();
+        if (isScreenAsleep) {
+            isScreenAsleep = false;
+            setBacklightBrightness(cfg.screen_brightness);
+            
+            // Megvárjuk, amíg elengeded a kijelzőt, így az ébresztő touch nem nyom meg gombot!
+            while (touch.getTouch(&touchX, &touchY, &touchGesture)) {
+                delay(10);
+            }
+            delay(100); // Szünet az elengedés után
+            return;
+        }
+    }
+
+    // Képernyő elaltatása a beállított időzítés után
+    if (cfg.screen_sleep && !isScreenAsleep) {
+        if (millis() - lastActivityTime >= (unsigned long)cfg.screen_timeout * 1000) {
+            isScreenAsleep = true;
+            setBacklightBrightness(0); // Háttérvilágítás lekapcsolása
+        }
+    }
+
+    // Ha alvó módban van a képernyő, kihagyjuk a rajzolást és az UI gombok kezelését
+    if (isScreenAsleep) {
+        delay(20);
+        return;
+    }
+
     if (currentState == STATE_MAIN && mainScreen) {
         mainScreen->draw(octoMqtt->getData(), klipperClient->getData());
 
         int touchAction = mainScreen->handleTouch();
 
         if (touchAction == 2) { 
-            Serial.println("[ACTION] OctoPrint szüneteltetése (MQTT)");
+            Serial.println("[ACTION] OctoPrint szüneteltetése (REST API)");
         }
         else if (touchAction == 4) { 
-            Serial.println("[ACTION] OctoPrint megszakítása (MQTT)");
+            Serial.println("[ACTION] OctoPrint megszakítása (REST API)");
         }
         else if (touchAction == 12) { 
             Serial.println("[ACTION] Klipper szüneteltetése");

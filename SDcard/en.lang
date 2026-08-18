@@ -1,0 +1,382 @@
+# English language file - OctoklipScreen
+wifi_connecting=Connecting to WiFi...
+wifi_authenticating=Authenticating with router...
+wifi_dhcp=Requesting IP address (DHCP)...
+wifi_waiting=Waiting for network...
+wifi_connected=Connected!
+wifi_err_no_ssid=SSID not found!
+wifi_err_bad_pass=Invalid password or key!
+wifi_err_lost=Connection lost!
+wifi_err_timeout=Timeout (20s timeout)
+wifi_no_wifi=No WiFi
+wifi_conn_error=Connection error
+
+klipper_menu_title=-- KLIPPER MENU --
+klipper_btn_macros=Quick Macros / Commands
+klipper_btn_tune=Tune / Z-Offset Adjust
+klipper_default_name=Klipper Printer
+klipper_tune_title_screen=KLIPPER TUNE
+klipper_label_speed=Speed
+klipper_label_nozzle=Nozzle
+klipper_label_bed=Bed
+klipper_label_zoffset=Z-Offset Adj.
+
+octo_menu_title=-- OCTOPRINT MENU --
+octo_menu_mqtt_title=-- OCTOPRINT MENU (MQTT) --
+octo_menu_prepare_title=-- PREPARE --
+octo_menu_calib_title=-- CALIBRATION --
+octo_menu_control_title=-- CONTROL --
+octo_menu_filament_title=-- FILAMENT --
+octo_menu_tune_title_http=OCTOPRINT TUNE
+octo_menu_tune_title=OCTOPRINT TUNE (MQTT)
+octo_menu_zoffset_title=Z-OFFSET CALIBRATION
+octo_menu_mesh_title=BED MESH MANAGEMENT
+octo_title_bed_mesh=BED MESH
+
+octo_btn_prepare=Prepare
+octo_btn_control=Control
+octo_btn_calibration=Calibration
+octo_btn_filament_btn=Filament
+octo_btn_zoffset=Z-Offset
+octo_btn_bedmesh=Bed Mesh
+octo_btn_leveling=Leveling
+octo_btn_other=Other
+octo_coming_soon=Coming soon...
+
+octo_btn_autohome=Auto Home (G28)
+octo_btn_homing=Homing in progress...
+octo_btn_steppers_off=Steppers Off (M84)
+octo_btn_cooldown=Cooldown
+octo_btn_zhome=Z-Home (G28 Z)
+octo_btn_save=Save (M500)
+octo_btn_build_3x3=Build 3x3
+octo_btn_build_5x5=Build 5x5
+octo_btn_measuring=Measuring...
+octo_btn_show_mesh=Show Mesh
+octo_label_zoffset_adj=Z-Offset Adj.
+
+# Z-Offset submenu text
+zoffset_positioning=Positioning (G28 + Z0)...
+zoffset_start_calib=Start Calib. (G28 + Z=0)
+zoffset_g28_g1_progress=G28 and G1 Z0 F300 in progress...
+zoffset_wait_ok=Wait for 'OK'!
+zoffset_start_req=Start required!
+zoffset_press_btn_above=Press button above to adjust!
+zoffset_mod_label=Z-Offset Modification
+zoffset_save_rehome=Save (M500) & Re-home
+zoffset_positioning_short=Positioning...
+zoffset_saving=Saving...
+
+# Tune Menu text
+tune_header_main=Fine Tuning
+tune_header_temp=Temperatures
+tune_header_speed=Speed (Feedrate)
+tune_header_zoffset=Z-Offset (Babystepping)
+tune_header_camera=Camera View
+tune_btn_temp=Temperature
+tune_btn_speed=Speed
+tune_btn_zoffset=Z-Offset
+tune_btn_camera=Camera View
+tune_btn_default_speed=Default (100%)
+tune_head_fmt=Head: %.0f / %.0f C
+tune_bed_fmt=Bed: %.0f / %.0f C
+tune_curr_speed=Current speed: 
+tune_cam_downloading=Downloading camera image...
+tune_cam_no_ip=No IP address specified!
+tune_cam_empty_data=Empty image data received!
+tune_cam_sd_error=SD card write error!
+tune_cam_error_http=Camera error! (HTTP 
+
+# Control menu text
+control_btn_move=Move
+control_btn_temp=Temperature
+control_btn_bltouch=BL/CR Touch
+control_btn_fan=Cooling
+control_bltouch_title=BL/CR Touch
+control_btn_pin_out=Pin Out
+control_btn_pin_in=Pin In
+control_btn_selftest=Self Test
+control_btn_reset=Reset
+control_fan_title=Cooling
+control_btn_fan_off=Fan OFF (0%)
+
+octo_msg_downloading_mesh=Downloading data...
+octo_label_speed=Speed
+
+popup_unsupported_title=NOT SUPPORTED!
+popup_unsupported_line1=Machine does not support 5x5.
+popup_unsupported_line2=Starting 3x3 mesh...
+popup_nomesh_title=NO MESH!
+popup_nomesh_line1=Must create a bed mesh
+popup_nomesh_line2=in EEPROM first!
+popup_meshsaved_title=MESH SAVED!
+popup_meshsaved_line1=EEPROM & Cooldown OK
+
+octo_menu_filament_temp=Filament / Temp Settings
+octo_menu_speed_flow=Speed / Flow Correction
+octo_btn_filament=Filament / Temp Settings
+octo_btn_speed=Speed / Flow Modifier
+octo_default_name=OctoPrint Printer
+octo_status_working=Working
+octo_status_unknown=Unknown
+
+btn_back=< BACK
+btn_ok=OK
+
+# MainScreen text
+main_screen_nozzle=NOZZLE
+main_screen_bed=BED
+main_screen_status=Status: 
+main_screen_remaining=Remaining:
+main_screen_settings=[ SETTINGS ]
+main_screen_pause=PAUSE
+main_screen_tune=TUNE
+main_screen_cancel=CANCEL
+main_screen_no_protocol=No protocol enabled!
+main_screen_webui_hint=Open WebUI for configuration!
+main_screen_api=API
+main_screen_api_error_title=API ERROR!
+main_screen_api_error_line1=This feature requires API
+main_screen_api_error_line2=access configuration in WebUI.
+main_screen_pause_progress=Pausing...
+main_screen_resume_progress=Resuming...
+main_screen_cancel_progress=Stopping...
+
+# Print statuses
+Paused=Paused
+Pausing=Pausing...
+Cancelling=Stopping print...
+Folytatas...=Resuming...
+Szuneteltetes...=Pausing...
+Szuneteltve=Paused
+Nyomtatas leallitasa...=Stopping print...
+header_mode_mqtt=MQTT
+header_mode_timed=TIMED
+
+# MenuScreen text
+menu_title=SETTINGS
+menu_btn_wifi=WiFi
+menu_btn_language=Language
+menu_btn_skin=Skin
+menu_btn_system=System
+menu_status_octo=Octo:  
+menu_status_klipper=Klipper:
+menu_status_print=PRINT
+menu_status_standby=STANDBY
+menu_status_err=ERR
+menu_status_off=OFF
+system_btn_display=Display
+
+wifi_menu_title=WIFI
+wifi_menu_ssid=SSID: 
+wifi_menu_ip=IP:
+wifi_menu_gateway=Gateway:
+wifi_menu_status=Status: 
+wifi_connected_text=Connected
+wifi_none_text=None
+
+server_menu_title=SERVERS
+server_octoprint=OctoPrint
+server_klipper=Klipper
+
+skin_menu_title=SKIN
+skin_dark=Dark
+skin_light=Light
+skin_colorful=Colorful
+
+system_menu_title=SYSTEM
+system_restart=Restart
+system_del_config=Delete Config
+system_format_sd=Format SD
+system_btn_info=Info
+system_btn_led=LED: 
+
+# Display Settings
+display_menu_title=DISPLAY SETTINGS
+display_screen_sleep=Screen sleep: 
+display_sleep_timeout=Sleep time: 
+display_brightness=Brightness: 
+
+# System Info submenu text
+info_menu_title=SYSTEM INFO
+info_free_ram=Free RAM: 
+info_fw_version=FW Version: 
+info_octo_version=OctoPrint: 
+info_sd_files=SD Files: 
+
+# SplashScreen text
+splash_init=Starting OctoScreen...
+splash_ap_title=--- AP MODE (NO WIFI) ---
+splash_error=Error: 
+splash_ssid=1. SSID: 
+splash_pass=2. Password: 
+splash_webui_ip=3. WebUI IP:  
+splash_open_browser=Open in browser to configure!
+splash_client_connected=Client connected
+splash_waiting_client=Waiting for client...
+splash_connected_title=--- CONNECTED TO NETWORK ---
+splash_device_ip=Device IP:
+splash_octoprint=OctoPrint:
+splash_klipper=Klipper:
+splash_active=Active
+splash_disabled=Disabled
+splash_webui_available=WebUI available on this IP as well.
+splash_err_plugin_title=ERROR: MISSING PLUGIN!
+splash_err_plugin_req=OctoKlipscreenBridge required!
+splash_err_install_from=Install from:
+splash_err_plugin_url1=github.com/karolyia79/
+splash_err_plugin_url2=OctoklipscreenBridge
+splash_err_mqtt_title=ERROR: MQTT BROKER NOT AVAILABLE!
+splash_err_mqtt_no_resp=Mosquitto server is not responding.
+splash_err_todo=Action required:
+splash_err_mqtt_todo1=Start the Mosquitto broker
+splash_err_mqtt_todo2=or check the IP address!
+splash_touch_to_continue=Touch screen to continue
+
+# Boot / System messages
+boot_octo_check=Checking OctoPrint API...
+boot_mqtt_check=Checking MQTT connection...
+boot_bridge_check=Checking Bridge plugin...
+boot_sys_ready=System ready.
+
+# Logger and Config messages
+logger_file_created=Log file created.
+config_sd_failed=SD.begin error! SD card unavailable.
+sys_init=Starting system...
+
+# AP WebUI text
+ap_title=OctoScreen Configuration
+ap_lang_title=Language / Nyelv
+ap_wifi_settings=Wi-Fi Settings
+ap_scan_networks=Scan Networks
+ap_selected_ssid=Selected SSID:
+ap_manual_ssid=Or manual SSID:
+ap_wifi_pass=Wi-Fi Password:
+ap_show_pass=Show password
+ap_use_static=Use static IP
+ap_ip_address=IP Address:
+ap_gateway=Gateway:
+ap_subnet=Subnet Mask:
+ap_dns=DNS Server:
+ap_octo_enabled=Enable OctoPrint Connection
+ap_octo_ip=OctoPrint IP / Host:
+ap_octo_key=API Key:
+ap_klipper_enabled=Enable Klipper (Moonraker)
+ap_klipper_ip=Klipper IP / Host:
+ap_klipper_port=Port (Moonraker):
+ap_klipper_key=API Key (Optional):
+ap_save_btn=Save and Restart
+ap_maintenance=Maintenance & System
+ap_restart_desc=Immediately restart device.
+ap_restart_btn=Restart Device
+ap_format_desc=Erase all contents on SD card and reset.
+ap_format_btn=Erase / Format SD Card
+
+# AP WebUI dynamic keys
+ap_err_lang_change=Error changing language!
+ap_scan_in_progress=Scanning in progress...
+ap_scan_error=Error scanning networks!
+ap_confirm_restart=Are you sure you want to restart the device?
+ap_restarting_msg=Device restarting... Please wait.
+ap_op_error=Error occurred during operation!
+ap_confirm_format=Are you sure you want to format the SD card? All settings and log files will be lost!
+ap_format_done_msg=SD card erased.
+ap_restarting=Restarting...
+ap_select_ssid_prompt=-- Select or search --
+ap_manual_ssid_placeholder=Enter manual SSID
+ap_save_success_msg=Settings saved successfully! Changes took effect immediately.
+ap_redirect_msg=Main page will load automatically shortly.
+ap_device_restarting=Device is restarting...
+ap_format_success_msg=SD card erased and reset! Device is restarting...
+
+# Other Calibration menus
+calib_other_title_http=-- OTHER CALIBRATION --
+calib_other_title=-- OTHER CALIBRATION (MQTT) --
+calib_btn_estep=E-Step Calibration
+calib_btn_pid=PID Calibration (Auto)
+calib_btn_mpc=MPC Calibration (Auto)
+calib_estep_mat_title=SELECT MATERIAL
+calib_estep_mat_sub=Before starting heating:
+calib_mat_pla=PLA (200 C)
+calib_mat_petg=PETG (230 C)
+calib_mat_abs=ABS (240 C)
+calib_heating_title=HEATING IN PROGRESS...
+calib_target_temp=Target temp:  
+calib_current_hotend=Current hotend:
+calib_temp_reached=Temperature reached!
+calib_ready_start=Ready to start.
+calib_btn_next_measure=Continue to measurement
+calib_heating_in_progress=Heating in progress...
+calib_estep_title=E-STEP CALIBRATION
+calib_estep_extrude_btn=1. 100mm Extrude (G1 E100)
+calib_estep_diff_label=Difference / Remaining (mm):
+calib_btn_save_eeprom=Save to EEPROM (M500)
+calib_pid_title=PID CALIBRATION
+calib_pid_desc1=Automatic hotend tuning.
+calib_pid_desc2=Starts M303 command,
+calib_pid_desc3=saveable after heating completes.
+calib_pid_start_btn=Start PID (M303)
+calib_pid_running_title=PID IN PROGRESS...
+calib_exit_save_disabled=Exit and save disabled!
+calib_pid_done=PID Autotune done!
+calib_waiting_cycles=Waiting for cycles...
+calib_mpc_title=MPC CALIBRATION
+calib_mpc_desc1=Model Predictive Control
+calib_mpc_desc2=Auto tuning and saving
+calib_mpc_desc3=to EEPROM.
+calib_mpc_start_btn=Start MPC
+calib_mpc_running_title=MPC IN PROGRESS...
+calib_mpc_done=MPC Autotune done!
+calib_popup_save_success=SAVE SUCCESSFUL
+calib_popup_estep_saved=E-Step saved & Cooldown OK
+calib_popup_cooldown_started=Cooldown (M104/M140 S0) started!
+calib_popup_pid_saved=PID values saved
+calib_popup_mpc_saved=MPC values saved
+calib_popup_eeprom_m500=to EEPROM (M500)!
+calib_popup_err_unsupported=ERROR: NOT SUPPORTED
+calib_popup_mpc_no_fw1=Printer firmware does
+calib_popup_mpc_no_fw2=not support MPC calibration!
+
+# Bed Leveling Menu text
+bedlevel_title_http=-- BED LEVELING --
+bedlevel_title_mqtt=-- BED LEVELING (MQTT) --
+bedlevel_btn_wiz=Leveling (Wizard / Manual)
+bedlevel_btn_coords=Set Coordinates
+bedlevel_wiz_title=LEVELING WIZARD
+bedlevel_wiz_process=Process...
+bedlevel_wiz_start=Start Leveling
+bedlevel_wiz_next_fr=Next: Front Right (FR)
+bedlevel_wiz_next_br=Next: Back Right (BR)
+bedlevel_wiz_next_bl=Next: Back Left (BL)
+bedlevel_wiz_finish=Finish (AutoHome)
+bedlevel_coords_title=SET COORDINATES
+bedlevel_corner_fl=Front Left (FL)
+bedlevel_corner_fr=Front Right (FR)
+bedlevel_corner_br=Back Right (BR)
+bedlevel_corner_bl=Back Left (BL)
+
+# MQTT Client Messages
+mqtt_conn_to_broker=[MQTT] Connecting to broker:
+mqtt_success_active=[MQTT SUCCESS] Connected!
+mqtt_event_mode_active=Event-driven mode ACTIVE.
+mqtt_err_failed_code=[MQTT ERROR] Connection failed. Status code:
+mqtt_reconnected_http_off=[MQTT SUCCESS] Reconnected! HTTP API Polling OFF.
+http_fallback_mesh_build=[HTTP Fallback] Building Bed Mesh (HTTP REST API)
+http_fallback_mesh_fetch=[HTTP Fallback] Fetching Bed Mesh (HTTP REST API)
+
+# OctoClient Log Messages
+octo_log_g28_done_heating=[OctoClient] G28 done -> Heating to 60 C...
+octo_log_bed_60_g29_start=[OctoClient] Bed reached 60 degrees!
+octo_log_g29_start=Starting G29...
+octo_log_g29_done_m500=[OctoClient] G29 done -> M500 save...
+octo_log_save_done_cooldown=[OctoClient] Save done -> Cooldown (M140 S0)...
+octo_log_mesh_download_ok=[OCTO_BASE] Mesh downloaded successfully via HTTP!
+octo_log_mesh_download_empty=[OCTO_BASE] Mesh data empty after download!
+
+# Main / System messages
+sys_loading=Loading system...
+sys_sd_error=SD MOUNT ERROR!
+sys_clean_boot=Starting system (Clean Boot)...
+sys_net_start=Starting network...
+sys_ap_stopped=AP mode stopped successfully, WebUI running on local IP!
+sys_octoconfig_created=[OctoConfig] Default octoconfig.json created.

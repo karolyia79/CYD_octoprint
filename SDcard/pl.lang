@@ -1,0 +1,382 @@
+# Plik jezykowy polski - OctoklipScreen
+wifi_connecting=Lacznie z WiFi...
+wifi_authenticating=Uwierzytelnianie z routerem...
+wifi_dhcp=Pobieranie adresu IP (DHCP)...
+wifi_waiting=Czekanie na siec...
+wifi_connected=Polaczono!
+wifi_err_no_ssid=Nie znaleziono SSID!
+wifi_err_bad_pass=Bledne haslo lub klucz!
+wifi_err_lost=Polaczenie utracone!
+wifi_err_timeout=Uplynal limit czasu (20s)
+wifi_no_wifi=Brak WiFi
+wifi_conn_error=Blad polaczenia
+
+klipper_menu_title=-- MENU KLIPPER --
+klipper_btn_macros=Szybkie Makra / Polecenia
+klipper_btn_tune=Strojenie / Z-Offset
+klipper_default_name=Drukarka Klipper
+klipper_tune_title_screen=STROJENIE KLIPPER
+klipper_label_speed=Speed
+klipper_label_nozzle=Nozzle
+klipper_label_bed=Bed
+klipper_label_zoffset=Z-Offset Adj.
+
+octo_menu_title=-- MENU OCTOPRINT --
+octo_menu_mqtt_title=-- MENU OCTOPRINT (MQTT) --
+octo_menu_prepare_title=-- PRZYGOTOWANIE --
+octo_menu_calib_title=-- KALIBRACJA --
+octo_menu_control_title=-- STEROWANIE --
+octo_menu_filament_title=-- FILAMENT --
+octo_menu_tune_title_http=OCTOPRINT STROJENIE
+octo_menu_tune_title=OCTOPRINT STROJENIE (MQTT)
+octo_menu_zoffset_title=KALIBRACJA Z-OFFSET
+octo_menu_mesh_title=ZARZADZANIE BED MESH
+octo_title_bed_mesh=BED MESH
+
+octo_btn_prepare=Przygotowanie
+octo_btn_control=Sterowanie
+octo_btn_calibration=Kalibracja
+octo_btn_filament_btn=Filament
+octo_btn_zoffset=Z-Offset
+octo_btn_bedmesh=Bed Mesh
+octo_btn_leveling=Poziomowanie
+octo_btn_other=Inne
+octo_coming_soon=Wkrótce...
+
+octo_btn_autohome=Auto Home (G28)
+octo_btn_homing=Bazowanie w toku...
+octo_btn_steppers_off=Wylacz Silniki (M84)
+octo_btn_cooldown=Chlodzenie
+octo_btn_zhome=Z-Home (G28 Z)
+octo_btn_save=Zapisz (M500)
+octo_btn_build_3x3=Utworz 3x3
+octo_btn_build_5x5=Utworz 5x5
+octo_btn_measuring=Pomiar...
+octo_btn_show_mesh=Pokaz Mesh
+octo_label_zoffset_adj=Z-Offset Adj.
+
+# Teksty podmenu Z-Offset
+zoffset_positioning=Pozycjonowanie (G28 + Z0)...
+zoffset_start_calib=Start Kalib. (G28 + Z=0)
+zoffset_g28_g1_progress=G28 i G1 Z0 F300 w toku...
+zoffset_wait_ok=Czekaj na 'OK'!
+zoffset_start_req=Wymagany start!
+zoffset_press_btn_above=Nacisnij przycisk powyzej!
+zoffset_mod_label=Modyfikacja Z-Offset
+zoffset_save_rehome=Zapisz (M500) i Bazuj
+zoffset_positioning_short=Pozycjonowanie...
+zoffset_saving=Zapisywanie...
+
+# Teksty menu strojenia
+tune_header_main=Dokladne Strojenie
+tune_header_temp=Temperatury
+tune_header_speed=Predkosc (Feedrate)
+tune_header_zoffset=Z-Offset (Babystepping)
+tune_header_camera=Widok Kamery
+tune_btn_temp=Temperatura
+tune_btn_speed=Predkosc
+tune_btn_zoffset=Z-Offset
+tune_btn_camera=Widok Kamery
+tune_btn_default_speed=Domyslna (100%)
+tune_head_fmt=Glowica: %.0f / %.0f C
+tune_bed_fmt=Stol: %.0f / %.0f C
+tune_curr_speed=Aktualna predkosc: 
+tune_cam_downloading=Pobieranie obrazu kamery...
+tune_cam_no_ip=Brak podanego adresu IP!
+tune_cam_empty_data=Otrzymano puste dane obrazu!
+tune_cam_sd_error=Blad zapisu karty SD!
+tune_cam_error_http=Blad kamery! (HTTP 
+
+# Teksty menu sterowania
+control_btn_move=Ruch
+control_btn_temp=Temperatura
+control_btn_bltouch=BL/CR Touch
+control_btn_fan=Chlodzenie
+control_bltouch_title=BL/CR Touch
+control_btn_pin_out=Pin Wyjdz
+control_btn_pin_in=Pin Wejdz
+control_btn_selftest=Autotest
+control_btn_reset=Reset
+control_fan_title=Chlodzenie
+control_btn_fan_off=Wentylator WYL (0%)
+
+octo_msg_downloading_mesh=Pobieranie danych...
+octo_label_speed=Speed
+
+popup_unsupported_title=NIEOBSLUGIWANE!
+popup_unsupported_line1=Urzadzenie nie obsluguje 5x5.
+popup_unsupported_line2=Start pomiaru 3x3...
+popup_nomesh_title=BRAK MESH!
+popup_nomesh_line1=Najpierw utworz bed mesh
+popup_nomesh_line2=w pamieci EEPROM!
+popup_meshsaved_title=MESH ZAPISANY!
+popup_meshsaved_line1=EEPROM i Chlodzenie OK
+
+octo_menu_filament_temp=Filament / Ustawienia Temp.
+octo_menu_speed_flow=Korekcja Speed / Flow
+octo_btn_filament=Filament / Ustawienia Temp.
+octo_btn_speed=Speed / Flow Modyfikator
+octo_default_name=Drukarka OctoPrint
+octo_status_working=Pracuje
+octo_status_unknown=Nieznany
+
+btn_back=< POWROT
+btn_ok=OK
+
+# Teksty MainScreen
+main_screen_nozzle=NOZZLE
+main_screen_bed=BED
+main_screen_status=Status: 
+main_screen_remaining=Pozostalo:
+main_screen_settings=[ USTAWIENIA ]
+main_screen_pause=PAUZA
+main_screen_tune=STROJENIE
+main_screen_cancel=ANULUJ
+main_screen_no_protocol=Brak wlaczonego protokolu!
+main_screen_webui_hint=Otworz WebUI aby skonfigurowac!
+main_screen_api=API
+main_screen_api_error_title=BLAD API!
+main_screen_api_error_line1=Ta funkcja wymaga konfiguracji
+main_screen_api_error_line2=dostepu API w panelu WebUI.
+main_screen_pause_progress=Wstrzymywanie...
+main_screen_resume_progress=Wznawianie...
+main_screen_cancel_progress=Zatrzymywanie...
+
+# Statusy druku
+Paused=Wstrzymano
+Pausing=Wstrzymywanie...
+Cancelling=Anulowanie druku...
+Folytatas...=Wznawianie...
+Szuneteltetes...=Wstrzymywanie...
+Szuneteltve=Wstrzymano
+Nyomtatas leallitasa...=Anulowanie druku...
+header_mode_mqtt=MQTT
+header_mode_timed=TIMED
+
+# Teksty MenuScreen
+menu_title=USTAWIENIA
+menu_btn_wifi=WiFi
+menu_btn_language=Jezyk
+menu_btn_skin=Motyw
+menu_btn_system=System
+menu_status_octo=Octo:  
+menu_status_klipper=Klipper:
+menu_status_print=PRINT
+menu_status_standby=STANDBY
+menu_status_err=ERR
+menu_status_off=OFF
+system_btn_display=Ekran
+
+wifi_menu_title=WIFI
+wifi_menu_ssid=SSID: 
+wifi_menu_ip=IP:
+wifi_menu_gateway=Brama:
+wifi_menu_status=Status: 
+wifi_connected_text=Polaczono
+wifi_none_text=Brak
+
+server_menu_title=SERWERY
+server_octoprint=OctoPrint
+server_klipper=Klipper
+
+skin_menu_title=MOTYW
+skin_dark=Ciemny
+skin_light=Jasny
+skin_colorful=Kolorowy
+
+system_menu_title=SYSTEM
+system_restart=Restart
+system_del_config=Usun Konfiguracje
+system_format_sd=Formatuj SD
+system_btn_info=Info
+system_btn_led=LED: 
+
+# Ustawienia Ekranu
+display_menu_title=USTAWIENIA EKRANU
+display_screen_sleep=Wygaszenie ekranu: 
+display_sleep_timeout=Czas wygaszenia: 
+display_brightness=Jasnosc: 
+
+# Teksty podmenu System Info
+info_menu_title=INFORMACJE O SYSTEMIE
+info_free_ram=Wolny RAM: 
+info_fw_version=Wersja FW: 
+info_octo_version=OctoPrint: 
+info_sd_files=Pliki SD: 
+
+# Teksty SplashScreen
+splash_init=Uruchamianie OctoScreen...
+splash_ap_title=--- TRYB AP (BRAK WIFI) ---
+splash_error=Blad: 
+splash_ssid=1. SSID: 
+splash_pass=2. Haslo: 
+splash_webui_ip=3. WebUI IP:  
+splash_open_browser=Otworz w przegladarce aby skonfigurowac!
+splash_client_connected=Klient polaczony
+splash_waiting_client=Oczekiwanie na klienta...
+splash_connected_title=--- POLACZONO Z SIECIA ---
+splash_device_ip=IP Urzadzenia:
+splash_octoprint=OctoPrint:
+splash_klipper=Klipper:
+splash_active=Aktywny
+splash_disabled=Wylaczony
+splash_webui_available=WebUI dostepne rowniez pod tym IP.
+splash_err_plugin_title=BLAD: BRAKUJACA WTYCZKA!
+splash_err_plugin_req=Wymagany OctoKlipscreenBridge!
+splash_err_install_from=Zainstaluj z:
+splash_err_plugin_url1=github.com/karolyia79/
+splash_err_plugin_url2=OctoklipscreenBridge
+splash_err_mqtt_title=BLAD: BROKER MQTT NIEDOSTEPNY!
+splash_err_mqtt_no_resp=Serwer Mosquitto nie odpowiada.
+splash_err_todo=Wymagane dzialanie:
+splash_err_mqtt_todo1=Uruchom brokera Mosquitto
+splash_err_mqtt_todo2=lub sprawdz adres IP!
+splash_touch_to_continue=Dotknij ekran aby kontynuowac
+
+# Komunikaty Startowe / Systemowe
+boot_octo_check=Sprawdzanie OctoPrint API...
+boot_mqtt_check=Sprawdzanie polaczenia MQTT...
+boot_bridge_check=Sprawdzanie wtyczki Bridge...
+boot_sys_ready=System gotowy.
+
+# Komunikaty Loggera i Konfiguracji
+logger_file_created=Plik logu utworzony.
+config_sd_failed=Blad SD.begin! Karta SD niedostepna.
+sys_init=Uruchamianie systemu...
+
+# Teksty AP WebUI
+ap_title=Konfiguracja OctoScreen
+ap_lang_title=Jezyk / Language
+ap_wifi_settings=Ustawienia Wi-Fi
+ap_scan_networks=Skanuj Sieci
+ap_selected_ssid=Wybrane SSID:
+ap_manual_ssid=LUB wpisz SSID:
+ap_wifi_pass=Haslo Wi-Fi:
+ap_show_pass=Pokaz haslo
+ap_use_static=Uzyj statycznego IP
+ap_ip_address=Adres IP:
+ap_gateway=Brama (Gateway):
+ap_subnet=Maska Podsieci:
+ap_dns=Serwer DNS:
+ap_octo_enabled=Wlacz Polaczenie OctoPrint
+ap_octo_ip=OctoPrint IP / Host:
+ap_octo_key=Klucz API:
+ap_klipper_enabled=Wlacz Klipper (Moonraker)
+ap_klipper_ip=Klipper IP / Host:
+ap_klipper_port=Port (Moonraker):
+ap_klipper_key=Klucz API (Opcjonalnie):
+ap_save_btn=Zapisz i Restartuj
+ap_maintenance=Konserwacja i System
+ap_restart_desc=Natychmiastowy restart urzadzenia.
+ap_restart_btn=Restartuj Urzadzenie
+ap_format_desc=Usun cala zawartosc karty SD.
+ap_format_btn=Usun / Formatuj Karte SD
+
+# Klucze dynamiczne AP WebUI
+ap_err_lang_change=Blad podczas zmiany jezyka!
+ap_scan_in_progress=Skanowanie w toku...
+ap_scan_error=Blad skanowania sieci!
+ap_confirm_restart=Czy na pewno chcesz zrestartowac urzadzenie?
+ap_restarting_msg=Restart urzadzenia... Prosze czekac.
+ap_op_error=Wystapil blad podczas operacji!
+ap_confirm_format=Czy na pewno chcesz sformatowac karte SD? Wszystkie ustawienia zostana utracone!
+ap_format_done_msg=Karta SD wyczyszczona.
+ap_restarting=Restartowanie...
+ap_select_ssid_prompt=-- Wybierz lub wyszukaj --
+ap_manual_ssid_placeholder=Wpisz SSID recznie
+ap_save_success_msg=Zapisano pomyślnie! Zmiany weszly w zycie.
+ap_redirect_msg=Strona glowna zaladuje sie automatycznie.
+ap_device_restarting=Urzadzenie uruchamia sie ponownie...
+ap_format_success_msg=Karta SD sformatowana! Urzadzenie restartuje sie...
+
+# Inne menu kalibracji
+calib_other_title_http=-- INNA KALIBRACJA --
+calib_other_title=-- INNA KALIBRACJA (MQTT) --
+calib_btn_estep=Kalibracja E-Step
+calib_btn_pid=Kalibracja PID (Auto)
+calib_btn_mpc=Kalibracja MPC (Auto)
+calib_estep_mat_title=WYBIERZ MATERIAL
+calib_estep_mat_sub=Przed rozpoczeciem grzania:
+calib_mat_pla=PLA (200 C)
+calib_mat_petg=PETG (230 C)
+calib_mat_abs=ABS (240 C)
+calib_heating_title=GRZANIE W TOKU...
+calib_target_temp=Temp docelowa:  
+calib_current_hotend=Aktualny hotend:
+calib_temp_reached=Osiagnieto temperature!
+calib_ready_start=Gotowe do startu.
+calib_btn_next_measure=Przejdz do pomiaru
+calib_heating_in_progress=Grzanie w toku...
+calib_estep_title=KALIBRACJA E-STEP
+calib_estep_extrude_btn=1. Ekstruduj 100mm (G1 E100)
+calib_estep_diff_label=Roznica / Pozostalo (mm):
+calib_btn_save_eeprom=Zapisz w EEPROM (M500)
+calib_pid_title=KALIBRACJA PID
+calib_pid_desc1=Automatyczne strojenie hotendu.
+calib_pid_desc2=Uruchamia polecenie M303,
+calib_pid_desc3=mozliwosc zapisu po nagrzaniu.
+calib_pid_start_btn=Start PID (M303)
+calib_pid_running_title=PID W TOKU...
+calib_exit_save_disabled=Wyjscie i zapis zablokowane!
+calib_pid_done=PID Autotune zakonczone!
+calib_waiting_cycles=Oczekiwanie na cykle...
+calib_mpc_title=KALIBRACJA MPC
+calib_mpc_desc1=Model Predictive Control
+calib_mpc_desc2=Automatyczne strojenie i zapis
+calib_mpc_desc3=do EEPROM.
+calib_mpc_start_btn=Start MPC
+calib_mpc_running_title=MPC W TOKU...
+calib_mpc_done=MPC Autotune zakonczone!
+calib_popup_save_success=ZAPISANO POMYSLNIE
+calib_popup_estep_saved=E-Step zapisane i Chlodzenie OK
+calib_popup_cooldown_started=Chlodzenie (M104/M140 S0) rozpoczęte!
+calib_popup_pid_saved=Wartosci PID zapisane
+calib_popup_mpc_saved=Wartosci MPC zapisane
+calib_popup_eeprom_m500=do EEPROM (M500)!
+calib_popup_err_unsupported=BLAD: NIE OBSLUGIWANE
+calib_popup_mpc_no_fw1=Firmware drukarki nie
+calib_popup_mpc_no_fw2=obsluguje kalibracji MPC!
+
+# Teksty menu Poziomowania Stolu
+bedlevel_title_http=-- POZIOMOWANIE STOLU --
+bedlevel_title_mqtt=-- POZIOMOWANIE STOLU (MQTT) --
+bedlevel_btn_wiz=Poziomowanie (Kreator / Recznie)
+bedlevel_btn_coords=Ustaw Wspolrzedne
+bedlevel_wiz_title=KREATOR POZIOMOWANIA
+bedlevel_wiz_process=Proces...
+bedlevel_wiz_start=Start Poziomowania
+bedlevel_wiz_next_fr=Nastepny: Przod Prawy (FR)
+bedlevel_wiz_next_br=Nastepny: Tyl Prawy (BR)
+bedlevel_wiz_next_bl=Nastepny: Tyl Lewy (BL)
+bedlevel_wiz_finish=Koniec (AutoHome)
+bedlevel_coords_title=USTAW WSPOLRZEDNE
+bedlevel_corner_fl=Przod Lewy (FL)
+bedlevel_corner_fr=Przod Prawy (FR)
+bedlevel_corner_br=Tyl Prawy (BR)
+bedlevel_corner_bl=Tyl Lewy (BL)
+
+# Komunikaty Klienta MQTT
+mqtt_conn_to_broker=[MQTT] Lacznie z brokerem:
+mqtt_success_active=[MQTT SUKCES] Polaczono!
+mqtt_event_mode_active=Tryb zdarzeniowy AKTYWNY.
+mqtt_err_failed_code=[MQTT BLAD] Polaczenie nieudane. Kod statusu:
+mqtt_reconnected_http_off=[MQTT SUKCES] Ponownie polaczono! HTTP API Polling WYL.
+http_fallback_mesh_build=[HTTP Fallback] Tworzenie Bed Mesh (HTTP REST API)
+http_fallback_mesh_fetch=[HTTP Fallback] Pobieranie Bed Mesh (HTTP REST API)
+
+# Komunikaty Logow OctoClient
+octo_log_g28_done_heating=[OctoClient] G28 zakonczone -> Grzanie do 60 C...
+octo_log_bed_60_g29_start=[OctoClient] Stol osiagnal 60 stopni!
+octo_log_g29_start=Uruchamianie G29...
+octo_log_g29_done_m500=[OctoClient] G29 zakonczone -> M500 zapis...
+octo_log_save_done_cooldown=[OctoClient] Zapis zakonczony -> Chlodzenie (M140 S0)...
+octo_log_mesh_download_ok=[OCTO_BASE] Mesh pobrany pomyślnie przez HTTP!
+octo_log_mesh_download_empty=[OCTO_BASE] Dane Mesh puste po pobraniu!
+
+# Main / Komunikaty Systemowe
+sys_loading=Ladowanie systemu...
+sys_sd_error=BLAD MONTAZU SD!
+sys_clean_boot=Uruchamianie systemu (Clean Boot)...
+sys_net_start=Uruchamianie sieci...
+sys_ap_stopped=Tryb AP zatrzymany, WebUI dziala na lokalnym IP!
+sys_octoconfig_created=[OctoConfig] Domyslny octoconfig.json utworzony.

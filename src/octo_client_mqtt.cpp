@@ -3,6 +3,22 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
+static String formatSecondsToTime(unsigned long seconds) {
+    if (seconds == 0) return "--:--";
+    
+    unsigned long hours = seconds / 3600;
+    unsigned long minutes = (seconds % 3600) / 60;
+    unsigned long secs = seconds % 60;
+
+    char buffer[16];
+    if (hours > 0) {
+        snprintf(buffer, sizeof(buffer), "%02lu:%02lu:%02lu", hours, minutes, secs);
+    } else {
+        snprintf(buffer, sizeof(buffer), "%02lu:%02lu", minutes, secs);
+    }
+    return String(buffer);
+}
+
 OctoClientMqtt::OctoClientMqtt(PubSubClient* mqttClient, MqttMonitor* monitor) 
     : _mqtt(mqttClient), _monitor(monitor) {}
 
@@ -24,10 +40,22 @@ bool OctoClientMqtt::begin(const String& brokerIp, int port) {
         
         String tStr = String(topic);
         
-        if (tStr.indexOf("serial") != -1) {
-            this->parseSerialMessage(msg);
-        } else if (tStr.indexOf("temperature") != -1 || tStr.indexOf("state") != -1 || tStr.indexOf("progress") != -1) {
+        if (tStr == "octoprint/serial/status" || tStr.endsWith("/status")) {
+            msg.trim();
+            if (!this->_isHoming && !this->_meshBuildState && !this->_pidRunning && !this->_mpcRunning && !this->_cancelRunning) {
+                this->_data.status = msg;
+                if (msg == "Operational" || msg == "Complete" || msg == "Cancelled" || msg.indexOf("Failed") != -1) {
+                    this->_data.printingActive = false;
+                } else if (msg.indexOf("Printing") != -1 || msg.indexOf("Working") != -1 || msg.indexOf("Paus") != -1 || msg == "Paused") {
+                    this->_data.printingActive = true;
+                }
+            }
+        } 
+        else if (tStr.endsWith("/printer") || tStr.endsWith("/job") || tStr.endsWith("/profile") || tStr.indexOf("progress") != -1 || tStr == "octoprint/job") {
             this->parseJsonMessage(tStr, msg);
+        }
+        else if (tStr.indexOf("serial") != -1) {
+            this->parseSerialMessage(msg);
         }
 
         if (this->_monitor) {
@@ -42,42 +70,159 @@ bool OctoClientMqtt::begin(const String& brokerIp, int port) {
         _mqttActive = true;
         _data.mqttActive = true;
         _data.connected = true;
-        _mqtt->subscribe("octoprint/serial/#");
-        _mqtt->subscribe("octoprint/temperature/#");
-        _mqtt->subscribe("octoprint/printer/state");
+        _data.status = "Connected";
+
+        _mqtt->subscribe("octoprint/serial/serial");
+        _mqtt->subscribe("octoprint/serial/status");
+        _mqtt->subscribe("octoprint/serial/printer");
+        _mqtt->subscribe("octoprint/serial/job");
+        _mqtt->subscribe("octoprint/serial/profile");
+        _mqtt->subscribe("octoprint/job");             
         _mqtt->subscribe("octoprint/progress/print");
+
+        sendGcodeCommand("STATUS");
+        sendGcodeCommand("PROFILE");
+
         Serial.println(LangManager::get("mqtt_success_active"));
     } else {
         _mqttActive = false;
         _data.mqttActive = false;
         _data.connected = false;
+        _data.status = "Kapcsolódás...";
         Serial.printf("%s %d\n", LangManager::get("mqtt_err_failed_code").c_str(), _mqtt->state());
     }
     
     return _mqttActive;
 }
 
+void OctoClientMqtt::checkApiConnection() {
+    if (WiFi.status() != WL_CONNECTED || _octoIp.length() == 0 || _apiKey.length() == 0) {
+        _data.apiConnected = false;
+        return;
+    }
+
+    String ip = _octoIp;
+    if (ip.startsWith("http://")) ip = ip.substring(7);
+    else if (ip.startsWith("https://")) ip = ip.substring(8);
+    
+    String url = "http://" + ip + "/api/version";
+
+    HTTPClient http;
+    http.setTimeout(1500); 
+    http.begin(url);
+    http.addHeader("X-Api-Key", _apiKey);
+
+    int code = http.GET();
+    if (code == 200) {
+        _data.apiConnected = true;
+    } else {
+        _data.apiConnected = false;
+    }
+    http.end();
+}
+
 void OctoClientMqtt::parseJsonMessage(const String& topic, const String& payload) {
-    DynamicJsonDocument doc(512);
-    DeserializationError error = deserializeJson(doc, payload);
+    StaticJsonDocument<384> filter;
+    filter["profiles"]["_default"]["name"] = true;
+    filter["temperature"]["tool0"]["actual"] = true;
+    filter["temperature"]["tool0"]["target"] = true;
+    filter["temperature"]["bed"]["actual"] = true;
+    filter["temperature"]["bed"]["target"] = true;
+    filter["state"]["text"] = true;
+    filter["state"]["flags"]["printing"] = true;
+    filter["state"]["flags"]["paused"] = true;
+    filter["state"]["flags"]["operational"] = true;
+    filter["state"]["flags"]["cancelling"] = true;
+    filter["job"]["file"]["name"] = true;
+    filter["file"]["name"] = true;
+    filter["name"] = true;
+    filter["progress"]["completion"] = true;
+    filter["progress"]["printTimeLeft"] = true;
+    filter["progress"]["printTime"] = true;
+    filter["actual"] = true;
+    filter["target"] = true;
+    filter["progress"] = true;
+
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
     if (error) return;
 
-    if (topic.indexOf("temperature/tool0") != -1) {
-        if (doc.containsKey("actual")) _data.nozzleTemp = doc["actual"];
-        if (doc.containsKey("target")) _data.nozzleTarget = doc["target"];
-    } else if (topic.indexOf("temperature/bed") != -1) {
-        if (doc.containsKey("actual")) _data.bedTemp = doc["actual"];
-        if (doc.containsKey("target")) _data.bedTarget = doc["target"];
-    } else if (topic.indexOf("printer/state") != -1) {
-        if (doc.containsKey("text")) {
-            String stateText = doc["text"].as<String>();
-            if (!_isHoming && !_meshBuildState && !_pidRunning && !_mpcRunning) {
-                _data.status = stateText;
+    if (topic.endsWith("/profile")) {
+        if (doc.containsKey("profiles") && doc["profiles"]["_default"].containsKey("name")) {
+            _data.name = doc["profiles"]["_default"]["name"].as<String>();
+        }
+    }
+    else if (topic.endsWith("/printer") || topic.indexOf("temperature") != -1 || topic.indexOf("state") != -1) {
+        if (doc.containsKey("temperature")) {
+            if (doc["temperature"].containsKey("tool0")) {
+                if (doc["temperature"]["tool0"].containsKey("actual")) _data.nozzleTemp = doc["temperature"]["tool0"]["actual"].as<float>();
+                if (doc["temperature"]["tool0"].containsKey("target")) _data.nozzleTarget = doc["temperature"]["tool0"]["target"].as<float>();
+            }
+            if (doc["temperature"].containsKey("bed")) {
+                if (doc["temperature"]["bed"].containsKey("actual")) _data.bedTemp = doc["temperature"]["bed"]["actual"].as<float>();
+                if (doc["temperature"]["bed"].containsKey("target")) _data.bedTarget = doc["temperature"]["bed"]["target"].as<float>();
+            }
+        } else {
+            if (topic.indexOf("temperature/tool0") != -1) {
+                if (doc.containsKey("actual")) _data.nozzleTemp = doc["actual"].as<float>();
+                if (doc.containsKey("target")) _data.nozzleTarget = doc["target"].as<float>();
+            } else if (topic.indexOf("temperature/bed") != -1) {
+                if (doc.containsKey("actual")) _data.bedTemp = doc["actual"].as<float>();
+                if (doc.containsKey("target")) _data.bedTarget = doc["target"].as<float>();
             }
         }
-    } else if (topic.indexOf("progress/print") != -1) {
+
+        if (doc.containsKey("state")) {
+            JsonObject st = doc["state"];
+            String stateText = st.containsKey("text") ? st["text"].as<String>() : "";
+            
+            bool isPrintingFlag = st.containsKey("flags") && st["flags"].containsKey("printing") ? st["flags"]["printing"].as<bool>() : false;
+            bool isPausedFlag = st.containsKey("flags") && st["flags"].containsKey("paused") ? st["flags"]["paused"].as<bool>() : false;
+            bool isOperational = st.containsKey("flags") && st["flags"].containsKey("operational") ? st["flags"]["operational"].as<bool>() : false;
+
+            if (!_cancelRunning) {
+                if (stateText == "Operational" || stateText == "Complete" || stateText == "Cancelled" || stateText == "Failed" || (isOperational && !isPrintingFlag && !isPausedFlag)) {
+                    _data.printingActive = false;
+                } else if (isPrintingFlag || isPausedFlag || stateText == "Printing" || stateText.indexOf("Printing") != -1 || stateText.indexOf("Working") != -1 || stateText == "Paused" || stateText.indexOf("Paus") != -1) {
+                    _data.printingActive = true;
+                }
+            }
+
+            if (!_isHoming && !_meshBuildState && !_pidRunning && !_mpcRunning && !_cancelRunning) {
+                if (stateText.length() > 0) {
+                    _data.status = stateText;
+                }
+            }
+        }
+    }
+    else if (topic.endsWith("/job") || topic.indexOf("progress") != -1 || topic == "octoprint/job") {
+        String fName = "";
+        if (doc.containsKey("job") && doc["job"].containsKey("file") && doc["job"]["file"].containsKey("name") && !doc["job"]["file"]["name"].isNull()) {
+            fName = doc["job"]["file"]["name"].as<String>();
+        } else if (doc.containsKey("file") && doc["file"].containsKey("name") && !doc["file"]["name"].isNull()) {
+            fName = doc["file"]["name"].as<String>();
+        } else if (doc.containsKey("name") && !doc["name"].isNull()) {
+            fName = doc["name"].as<String>();
+        }
+
+        if (fName.length() > 0) {
+            if (fName.endsWith(".gcode")) fName = fName.substring(0, fName.length() - 6);
+            _data.printFileName = fName;
+        }
+
         if (doc.containsKey("progress")) {
-            _data.progress = doc["progress"];
+            if (doc["progress"].containsKey("completion") && !doc["progress"]["completion"].isNull()) {
+                _data.progress = (int)doc["progress"]["completion"].as<float>();
+            } else if (doc["progress"].is<int>()) {
+                _data.progress = doc["progress"].as<int>();
+            }
+
+            if (doc["progress"].containsKey("printTimeLeft") && !doc["progress"]["printTimeLeft"].isNull()) {
+                _data.remainingTime = formatSecondsToTime(doc["progress"]["printTimeLeft"].as<unsigned long>());
+            }
+            if (doc["progress"].containsKey("printTime") && !doc["progress"]["printTime"].isNull()) {
+                _data.totalTime = formatSecondsToTime(doc["progress"]["printTime"].as<unsigned long>());
+            }
         }
     }
 }
@@ -162,7 +307,9 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
         }
     }
 
-    if (_isHoming) {
+    if (_cancelRunning) {
+        _data.status = "Cancelling";
+    } else if (_isHoming) {
         _data.status = "Homing";
     } else if (isMeshBuilding()) {
         _data.status = "Mesh Building";
@@ -173,12 +320,18 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
     } else {
         if (msg.indexOf("busy: processing") != -1) {
             _data.status = "Working";
+        } else if (_data.status == "Homing" || _data.status == "Mesh Building" || _data.status == "Kapcsolódás..." || _data.status == "Kapcsolódás") {
+            if (!_data.printingActive) {
+                _data.status = "Connected";
+            }
         }
     }
 }
 
 void OctoClientMqtt::update() {
-    if (_pidRunning) {
+    if (_cancelRunning) {
+        _data.status = "Cancelling";
+    } else if (_pidRunning) {
         _data.status = "PID Autotune running";
     } else if (_mpcRunning) {
         _data.status = "MPC Autotune running";
@@ -190,24 +343,44 @@ void OctoClientMqtt::update() {
         if (_monitor) _monitor->clearWatchers();
     }
 
+    unsigned long now = millis();
+    if (WiFi.status() == WL_CONNECTED && _octoIp.length() > 0 && _apiKey.length() > 0) {
+        if (now - _lastApiCheckTime > 10000 || _lastApiCheckTime == 0) {
+            _lastApiCheckTime = now;
+            checkApiConnection();
+        }
+    } else {
+        _data.apiConnected = false;
+    }
+
     if (WiFi.status() == WL_CONNECTED) {
         if (!_mqtt->connected()) {
             _mqttActive = false;
             _data.mqttActive = false;
             _data.connected = false;
+            _data.status = "Kapcsolódás...";
             
             if (millis() - _lastReconnectAttempt > 5000) {
                 _lastReconnectAttempt = millis();
                 String clientId = "OctoKlip_" + String((uint32_t)ESP.getEfuseMac(), HEX);
                 
                 if (_mqtt->connect(clientId.c_str())) {
-                    _mqtt->subscribe("octoprint/serial/#");
-                    _mqtt->subscribe("octoprint/temperature/#");
-                    _mqtt->subscribe("octoprint/printer/state");
+                    _mqtt->subscribe("octoprint/serial/serial");
+                    _mqtt->subscribe("octoprint/serial/status");
+                    _mqtt->subscribe("octoprint/serial/printer");
+                    _mqtt->subscribe("octoprint/serial/job");
+                    _mqtt->subscribe("octoprint/serial/profile");
+                    _mqtt->subscribe("octoprint/job");
                     _mqtt->subscribe("octoprint/progress/print");
+                    
                     _mqttActive = true;
                     _data.mqttActive = true;
                     _data.connected = true;
+                    _data.status = "Connected";
+                    
+                    sendGcodeCommand("STATUS");
+                    sendGcodeCommand("PROFILE");
+
                     Serial.println(LangManager::get("mqtt_reconnected_http_off"));
                 }
             }
@@ -215,12 +388,22 @@ void OctoClientMqtt::update() {
             _mqttActive = true;
             _data.mqttActive = true;
             _data.connected = true;
+
+            if (!_isHoming && !isMeshBuilding() && !_pidRunning && !_mpcRunning && !_cancelRunning) {
+                if (_data.status == "Kapcsolódás..." || _data.status == "Kapcsolódás") {
+                    if (!_data.printingActive) {
+                        _data.status = "Connected";
+                    }
+                }
+            }
+
             _mqtt->loop();
         }
     } else {
         _mqttActive = false;
         _data.mqttActive = false;
         _data.connected = false;
+        _data.status = "Kapcsolódás...";
     }
 
     // --- BED MESH FÁZIS-3 -> FÁZIS-4 DIAGNOSZTIKUS VEZÉRLŐ ---
@@ -309,6 +492,75 @@ void OctoClientMqtt::sendGcodeCommand(const String& gcode) {
         _mqtt->publish("octoprint/serial/command", gcode.c_str());
     }
 }
+
+// ---------------------------------------------------------
+// HTTP REST API VEZÉRLÉS (Pause, Resume, Cancel)
+// ---------------------------------------------------------
+
+void OctoClientMqtt::sendApiJobCommand(const String& jsonPayload) {
+    if (WiFi.status() != WL_CONNECTED || _octoIp.length() == 0) {
+        Serial.println("[REST API ERROR] Nincs WiFi kapcsolat vagy hianyzik az OctoPrint IP!");
+        _data.apiConnected = false;
+        return;
+    }
+
+    String ip = _octoIp;
+    if (ip.startsWith("http://")) {
+        ip = ip.substring(7);
+    } else if (ip.startsWith("https://")) {
+        ip = ip.substring(8);
+    }
+    String url = "http://" + ip + "/api/job";
+
+    HTTPClient http;
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+    
+    if (_apiKey.length() > 0) {
+        http.addHeader("X-Api-Key", _apiKey);
+    }
+
+    Serial.printf("[%lu ms] [REST API TX] URL: %s | Payload: %s\n", millis(), url.c_str(), jsonPayload.c_str());
+    
+    int httpResponseCode = http.POST(jsonPayload);
+    
+    if (httpResponseCode >= 200 && httpResponseCode < 300) {
+        _data.apiConnected = true;
+        Serial.printf("[%lu ms] [REST API RX] HTTP Valaszkod: %d\n", millis(), httpResponseCode);
+    } else {
+        _data.apiConnected = false;
+        Serial.printf("[%lu ms] [REST API ERROR] HTTP Hiba: %d / %s\n", millis(), httpResponseCode, http.errorToString(httpResponseCode).c_str());
+    }
+    
+    http.end();
+}
+
+void OctoClientMqtt::pausePrint() {
+    Serial.println("[REST API EXEC] Pause / Resume Print");
+    if (_data.status == "Paused" || _data.status == "Szüneteltetve") {
+        _data.status = "Folytatás...";
+        sendApiJobCommand("{\"command\":\"pause\",\"action\":\"resume\"}");
+    } else {
+        _data.status = "Szüneteltetés...";
+        sendApiJobCommand("{\"command\":\"pause\",\"action\":\"pause\"}");
+    }
+}
+
+void OctoClientMqtt::resumePrint() {
+    Serial.println("[REST API EXEC] Resume Print");
+    _data.status = "Folytatás...";
+    sendApiJobCommand("{\"command\":\"pause\",\"action\":\"resume\"}");
+}
+
+void OctoClientMqtt::cancelPrint() {
+    Serial.println("[REST API EXEC] Cancel Print");
+    _data.status = "Nyomtatás leállítása...";
+    sendApiJobCommand("{\"command\":\"cancel\"}");
+}
+
+// ---------------------------------------------------------
+// MQTT / EGYÉB FUNKCIÓK INNENTŐL
+// ---------------------------------------------------------
 
 void OctoClientMqtt::extrudeFilament(float lengthMm, float speedMmMin) {
     sendGcodeCommand("G91");
@@ -461,7 +713,7 @@ void OctoClientMqtt::startPidAutotune() {
             prefs.putBool("calib_active", false);
             prefs.end();
 
-            this->_data.status = "Online";
+            this->_data.status = "Connected";
             this->_pendingClearWatchers = true;
         }
     });
@@ -493,7 +745,7 @@ void OctoClientMqtt::stopCalibration() {
     prefs.putBool("calib_active", false);
     prefs.end();
 
-    _data.status = "Online";
+    _data.status = "Connected";
     _pendingClearWatchers = true;
 }
 
