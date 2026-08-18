@@ -10,6 +10,7 @@
 #include "klipper_menu.h"
 #include "menuscreen.h"
 #include "connection.h"
+#include "status_animation.h"
 
 class MainScreen {
 public:
@@ -47,8 +48,10 @@ private:
     OctoMenuMqtt _octoMenuMqtt;
     KlipperMenu _klipperMenu;
     MenuScreen _menuScreen;
+    StatusAnimation _statusAnim;
 
     bool _showApiErrorPopup = false;
+    bool _showCancellingPopup = false; // Popup indikátor a leállítás alatti nyomásra
 
     void drawHeader(const String& name, bool isServerConnected, bool isApiConnected = false);
     void drawOctoPage(const OctoPrinterData& info);
@@ -60,6 +63,7 @@ private:
     void drawPrintControls();
     void drawDisabledPage(const String& title);
     void drawApiErrorPopup();
+    void drawCancellingPopup(); // Új popup rajzoló
 };
 
 #endif

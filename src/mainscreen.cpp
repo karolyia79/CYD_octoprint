@@ -7,7 +7,7 @@
 MainScreen::MainScreen(TFT_eSPI* tft, CST820* touch, bool octoEnabled, bool klipperEnabled, OctoClientMqtt* octoMqtt) 
     : _tft(tft), _touch(touch), _octoEnabled(octoEnabled), _klipperEnabled(klipperEnabled), 
       _octoMqtt(octoMqtt), _isPrinting(false), 
-      _octoMenuMqtt(tft), _klipperMenu(tft), _menuScreen(tft, touch) {}
+      _octoMenuMqtt(tft), _klipperMenu(tft), _menuScreen(tft, touch), _statusAnim(tft) {}
 
 void MainScreen::init() {
     _currentPage = 0;
@@ -17,10 +17,12 @@ void MainScreen::init() {
     _isPrinting = false;
     _lastMainPage = 0;
     _showApiErrorPopup = false;
+    _showCancellingPopup = false;
     
     _octoLastNozzle = -999; _octoLastBed = -999; _octoLastProgress = -1; _octoLastStatus = "";
     _klipperLastNozzle = -999; _klipperLastBed = -999; _klipperLastProgress = -1; _klipperLastStatus = "";
     
+    _statusAnim.init(215, 110, 85, 70);
     _menuScreen.init();
     Serial.println("[TRACE] MainScreen initialized.");
 }
@@ -29,10 +31,21 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
     ThemeColors theme = getCurrentTheme();
 
     bool octoPrinting = octoData.printingActive;
+    bool klipperPrinting = (klipperData.progress > 0 && klipperData.progress < 100);
                         
     String octoHeaderName = octoData.name;
     if (octoPrinting && octoData.printFileName.length() > 0) {
         octoHeaderName = octoData.printFileName;
+    }
+
+    if (_menuState != 0) {
+        bool isCurrentPrinting = (_currentPage == 0) ? octoPrinting : klipperPrinting;
+        if (!isCurrentPrinting) {
+            _menuState = 0;
+            _octoMenuMqtt.openMainMenu();
+            _klipperMenu.openMainMenu();
+            _forceRedraw = true;
+        }
     }
 
     if (_menuState == 1) {
@@ -52,6 +65,20 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
         return;
     }
 
+    if (_menuState == 2) {
+        if (_forceRedraw) {
+            _tft->fillScreen(theme.bg);
+            _klipperMenu.forceRedraw();
+        }
+        
+        drawHeader(klipperData.name, klipperData.connected, false);
+        _tft->setTextColor(theme.text, theme.bg);
+        _klipperMenu.draw();
+        
+        _forceRedraw = false; 
+        return;
+    }
+
     int menuPageIndex = (_octoEnabled && _klipperEnabled) ? 2 : 1;
 
     if (_currentPage == menuPageIndex) {
@@ -59,7 +86,6 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
             _tft->fillScreen(theme.bg);
             _forceRedraw = false;
         }
-        bool klipperPrinting = (klipperData.progress > 0 && klipperData.progress < 100);
         
         _tft->setTextColor(theme.text, theme.bg);
         _menuScreen.draw(_octoEnabled, octoData.connected, octoPrinting, 
@@ -98,6 +124,10 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
 
     if (_showApiErrorPopup) {
         drawApiErrorPopup();
+    }
+
+    if (_showCancellingPopup) {
+        drawCancellingPopup();
     }
 
     _forceRedraw = false;
@@ -169,7 +199,6 @@ void MainScreen::drawOctoPage(const OctoPrinterData& info) {
     String lowerStatus = info.status;
     lowerStatus.toLowerCase();
     bool isCurrentlyPrinting = (lowerStatus.indexOf("printing") != -1 || lowerStatus.indexOf("paused") != -1 || info.printingActive);
-    _isPrinting = isCurrentlyPrinting;
 
     int currentProgress = isCurrentlyPrinting ? info.progress : 0;
     String timeStr = isCurrentlyPrinting ? info.remainingTime : "0h 00m";
@@ -181,12 +210,9 @@ void MainScreen::drawOctoPage(const OctoPrinterData& info) {
 }
 
 void MainScreen::drawKlipperPage(const KlipperPrinterData& info) {
-    // A drawHeader-t itt NEM hívjuk meg, mert a draw() már elintézte!
-
     String lowerStatus = info.status;
     lowerStatus.toLowerCase();
     bool isCurrentlyPrinting = (lowerStatus.indexOf("printing") != -1 || lowerStatus.indexOf("paused") != -1);
-    _isPrinting = isCurrentlyPrinting;
 
     int currentProgress = isCurrentlyPrinting ? info.progress : 0;
     String timeStr = isCurrentlyPrinting ? info.remainingTime : "0h 00m";
@@ -201,8 +227,8 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     
     ThemeColors theme = getCurrentTheme();
 
-    bool isNozzleHeating = (nTar > 0 && nT < nTar);
-    bool isBedHeating    = (bTar > 0 && bT < bTar);
+    bool isNozzleHeating = (nTar > 0 && nT < nTar - 1.0f);
+    bool isBedHeating    = (bTar > 0 && bT < bTar - 1.0f);
 
     float pulseFactor = (sin(millis() / 200.0) + 1.0) / 2.0;
     uint8_t redIntensity = 80 + (uint8_t)(175.0 * pulseFactor);
@@ -222,7 +248,7 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
         _tft->fillRoundRect(10, 45, 145, 55, 5, theme.cardBg); 
         _tft->fillRoundRect(165, 45, 145, 55, 5, theme.cardBg); 
         _tft->fillRoundRect(10, 105, 300, 80, 5, theme.cardBg);
-        _tft->drawRect(20, 138, 280, 14, theme.subText);
+        _tft->drawRect(20, 138, 185, 14, theme.subText); 
     }
 
     bool isPausedState = (status == "Paused" || status == "Szüneteltetve" || status == "Pausing" || status == "Szüneteltetés..." || status == LangManager::get("main_screen_resume_progress") || status == "Nyomtatás leállítása..." || status == "Cancelling");
@@ -235,6 +261,13 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
         } else {
             _tft->fillRect(10, 192, 300, 42, theme.bg); 
             drawMenuButton();
+
+            _octoMenuMqtt.openMainMenu();
+            _klipperMenu.openMainMenu();
+            if (_menuState != 0) {
+                _menuState = 0;
+                _forceRedraw = true;
+            }
         }
     }
 
@@ -271,6 +304,26 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
         drawPrintControls();
     }
 
+    // --- ANIMÁCIÓ ÁLLAPOT DETEKTÁLÁSA ---
+    String lowerStatus = status;
+    lowerStatus.toLowerCase();
+
+    bool isIdle = (lowerStatus.indexOf("operat") >= 0 || 
+                   lowerStatus.indexOf("standby") >= 0 || 
+                   lowerStatus.indexOf("ready") >= 0 || 
+                   lowerStatus.indexOf("off") >= 0 || 
+                   lowerStatus.indexOf("kikapcsolva") >= 0 || 
+                   lowerStatus.indexOf("idle") >= 0 || 
+                   lowerStatus == "");
+
+    bool isPaused = (lowerStatus.indexOf("pause") >= 0 || lowerStatus.indexOf("szünet") >= 0);
+
+    bool isMoving = (_isPrinting || !isIdle) && !isPaused;
+    bool isExtruding = _isPrinting && !isNozzleHeating && !isBedHeating && !isPaused;
+
+    _statusAnim.updateStatus(isBedHeating, isNozzleHeating, isMoving, isExtruding);
+    _statusAnim.update(theme.cardBg);
+
     if (!dataChanged && !pulseTick) return; 
 
     lastN = nT;
@@ -284,8 +337,8 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
 
     String displayStatus = LangManager::get(status);
     String fullStatusText = LangManager::get("main_screen_status") + " " + displayStatus;
-    if (fullStatusText.length() > 38) {
-        fullStatusText = fullStatusText.substring(0, 35) + "...";
+    if (fullStatusText.length() > 24) {
+        fullStatusText = fullStatusText.substring(0, 22) + "...";
     }
 
     _tft->fillRect(15, 63, 135, 22, theme.cardBg);
@@ -302,23 +355,27 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
 
     _tft->setTextDatum(ML_DATUM);
     _tft->setTextColor(theme.subText, theme.cardBg);
-    _tft->fillRect(15, 112, 290, 16, theme.cardBg);
+    _tft->fillRect(15, 112, 195, 16, theme.cardBg);
     _tft->drawString(fullStatusText, 20, 120, 2);
     
-    int barWidth = (278 * progress) / 100;
-    if (barWidth > 278) barWidth = 278;
+    int maxBarWidth = 183;
+    int barWidth = (maxBarWidth * progress) / 100;
+    if (barWidth > maxBarWidth) barWidth = maxBarWidth;
     if (barWidth < 0) barWidth = 0;
     
     _tft->fillRect(21, 139, barWidth, 12, theme.accent);
-    _tft->fillRect(21 + barWidth, 139, 278 - barWidth, 12, theme.cardBg);
+    _tft->fillRect(21 + barWidth, 139, maxBarWidth - barWidth, 12, theme.cardBg);
     
-    _tft->fillRect(20, 158, 280, 18, theme.cardBg);
+    _tft->fillRect(20, 158, 195, 18, theme.cardBg);
     _tft->setTextColor(theme.text, theme.cardBg);
     
     String displayTime = LangManager::get(time);
     String timeText = LangManager::get("main_screen_remaining") + " " + displayTime;
     if (totalTime.length() > 0 && totalTime != "--:--") {
         timeText += " / " + totalTime; 
+    }
+    if (timeText.length() > 24) {
+        timeText = timeText.substring(0, 22) + "...";
     }
     
     _tft->drawString(timeText, 20, 168, 2);
@@ -378,6 +435,25 @@ void MainScreen::drawApiErrorPopup() {
     UIUtils::drawButton(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_RED, TFT_WHITE, false, 2, 5);
 }
 
+// --- ÚJ POPUP A LEÁLLÍTÁSI FOLYAMAT ALATTI MEGNYOMÁSRA ---
+void MainScreen::drawCancellingPopup() {
+    ThemeColors theme = getCurrentTheme();
+    
+    _tft->fillRoundRect(20, 45, 280, 150, 8, theme.cardBg);
+    _tft->drawRoundRect(20, 45, 280, 150, 8, TFT_ORANGE);
+    _tft->drawRoundRect(21, 46, 278, 148, 7, TFT_ORANGE);
+
+    _tft->setTextDatum(TC_DATUM);
+    _tft->setTextColor(TFT_ORANGE, theme.cardBg);
+    _tft->drawString("FIGYELMEZTETES", 160, 58, 2);
+
+    _tft->setTextColor(theme.text, theme.cardBg);
+    _tft->drawString("Vard meg a leallasi", 160, 88, 2);
+    _tft->drawString("folyamat veget!", 160, 110, 2);
+
+    UIUtils::drawButton(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_ORANGE, TFT_WHITE, false, 2, 5);
+}
+
 void MainScreen::drawDisabledPage(const String& title) {
     if (_forceRedraw) {
         ThemeColors theme = getCurrentTheme();
@@ -402,6 +478,7 @@ int MainScreen::handleTouch() {
     static uint16_t currentX = 0;
     static uint16_t currentY = 0;
 
+    // --- API HIBA POPUP CSOPORT ---
     if (_showApiErrorPopup) {
         if (touched && !waitForRelease) {
             currentX = raw_y;
@@ -409,6 +486,22 @@ int MainScreen::handleTouch() {
             if (currentX >= 100 && currentX <= 220 && currentY >= 135 && currentY <= 190) {
                 UIUtils::pressFeedback(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_RED, TFT_WHITE, 2, 5);
                 _showApiErrorPopup = false;
+                _forceRedraw = true;
+                waitForRelease = true;
+            }
+        }
+        if (!touched) waitForRelease = false;
+        return 0;
+    }
+
+    // --- LEÁLLÍTÁSI POPUP CSOPORT ---
+    if (_showCancellingPopup) {
+        if (touched && !waitForRelease) {
+            currentX = raw_y;
+            currentY = 240 - raw_x;
+            if (currentX >= 100 && currentX <= 220 && currentY >= 135 && currentY <= 190) {
+                UIUtils::pressFeedback(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_ORANGE, TFT_WHITE, 2, 5);
+                _showCancellingPopup = false;
                 _forceRedraw = true;
                 waitForRelease = true;
             }
@@ -492,6 +585,8 @@ int MainScreen::handleTouch() {
             waitForRelease = true;
             if (menuResult == 0) { 
                 _menuState = 0;
+                _octoMenuMqtt.openMainMenu();
+                _klipperMenu.openMainMenu();
                 _forceRedraw = true;
                 return 0;
             }
@@ -536,12 +631,24 @@ int MainScreen::handleTouch() {
                 } 
                 else if (startX >= 218 && startX <= 310) { 
                     if (isOctoActive) {
-                        if (_octoMqtt && _octoMqtt->getData().apiConnected) {
-                            UIUtils::pressFeedback(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel"), TFT_RED, TFT_WHITE, 2, 5);
-                            _octoMqtt->cancelPrint();
-                        } else {
-                            _showApiErrorPopup = true;
-                            _forceRedraw = true;
+                        if (_octoMqtt) {
+                            String currentStatus = _octoMqtt->getData().status;
+                            
+                            // HA MÁR LEÁLLÍTÁSI FOLYAMATBAN VAN -> POPUP AKTI VÁLÁSA
+                            if (currentStatus == "Cancelling" || currentStatus == "Nyomtatás leállítása...") {
+                                UIUtils::pressFeedback(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel_progress"), TFT_RED, TFT_WHITE, 2, 5);
+                                _showCancellingPopup = true;
+                                _forceRedraw = true;
+                            } 
+                            else if (_octoMqtt->getData().apiConnected) {
+                                UIUtils::pressFeedback(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel"), TFT_RED, TFT_WHITE, 2, 5);
+                                _octoMqtt->cancelPrint();
+                                _isPrinting = true;
+                                _forceRedraw = true;
+                            } else {
+                                _showApiErrorPopup = true;
+                                _forceRedraw = true;
+                            }
                         }
                     }
                     waitForRelease = true; 

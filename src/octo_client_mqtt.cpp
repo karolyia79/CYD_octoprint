@@ -42,15 +42,27 @@ bool OctoClientMqtt::begin(const String& brokerIp, int port) {
         
         if (tStr == "octoprint/serial/status" || tStr.endsWith("/status")) {
             msg.trim();
-            if (!this->_isHoming && !this->_meshBuildState && !this->_pidRunning && !this->_mpcRunning && !this->_cancelRunning) {
+            Serial.printf("[%lu ms] [TRACE STATUS TOPIC] Msg: '%s' | _cancelRunning: %d\n", millis(), msg.c_str(), _cancelRunning);
+    
+            if (this->_cancelRunning) {
+                if (msg == "Operational" || msg == "Complete" || msg == "Cancelled" || msg.indexOf("Failed") != -1) {
+                    Serial.printf("[%lu ms] [TRACE CANCEL KILÉPÉS - STATUS!] Msg: '%s'\n", millis(), msg.c_str());
+                    this->_cancelRunning = false;
+                    this->_data.printingActive = false;
+                    this->_data.status = msg;
+                } else {
+                    this->_data.status = "Cancelling";
+                    this->_data.printingActive = true;
+                }
+            } else if (!this->_isHoming && !this->_meshBuildState && !this->_pidRunning && !this->_mpcRunning) {
                 this->_data.status = msg;
                 if (msg == "Operational" || msg == "Complete" || msg == "Cancelled" || msg.indexOf("Failed") != -1) {
                     this->_data.printingActive = false;
-                } else if (msg.indexOf("Printing") != -1 || msg.indexOf("Working") != -1 || msg.indexOf("Paus") != -1 || msg == "Paused") {
+                } else if (msg.indexOf("Printing") != -1 || msg.indexOf("Working") != -1 || msg.indexOf("Paus") != -1 || msg == "Paused" || msg == "Cancelling") {
                     this->_data.printingActive = true;
                 }
             }
-        } 
+        }
         else if (tStr.endsWith("/printer") || tStr.endsWith("/job") || tStr.endsWith("/profile") || tStr.indexOf("progress") != -1 || tStr == "octoprint/job") {
             this->parseJsonMessage(tStr, msg);
         }
@@ -152,50 +164,63 @@ void OctoClientMqtt::parseJsonMessage(const String& topic, const String& payload
             _data.name = doc["profiles"]["_default"]["name"].as<String>();
         }
     }
-    else if (topic.endsWith("/printer") || topic.indexOf("temperature") != -1 || topic.indexOf("state") != -1) {
-        if (doc.containsKey("temperature")) {
-            if (doc["temperature"].containsKey("tool0")) {
-                if (doc["temperature"]["tool0"].containsKey("actual")) _data.nozzleTemp = doc["temperature"]["tool0"]["actual"].as<float>();
-                if (doc["temperature"]["tool0"].containsKey("target")) _data.nozzleTarget = doc["temperature"]["tool0"]["target"].as<float>();
-            }
-            if (doc["temperature"].containsKey("bed")) {
-                if (doc["temperature"]["bed"].containsKey("actual")) _data.bedTemp = doc["temperature"]["bed"]["actual"].as<float>();
-                if (doc["temperature"]["bed"].containsKey("target")) _data.bedTarget = doc["temperature"]["bed"]["target"].as<float>();
+
+    if (doc.containsKey("state")) {
+        JsonObject st = doc["state"];
+        String stateText = st.containsKey("text") ? st["text"].as<String>() : "";
+    
+        bool isPrintingFlag = st.containsKey("flags") && st["flags"].containsKey("printing") ? st["flags"]["printing"].as<bool>() : false;
+        bool isPausedFlag = st.containsKey("flags") && st["flags"].containsKey("paused") ? st["flags"]["paused"].as<bool>() : false;
+        bool isOperational = st.containsKey("flags") && st["flags"].containsKey("operational") ? st["flags"]["operational"].as<bool>() : false;
+
+        // Ha a szöveg "Cancelling" vagy "Pausing", AZONNAL rögzítjük, hogy törlés/szüneteltetés alatt vagyunk
+        bool isCancellingState = (stateText == "Cancelling" || stateText.indexOf("Cancelling") != -1 || stateText.indexOf("Nyomtatás leállítása") != -1);
+
+        if (_cancelRunning || isCancellingState) {
+            if (stateText == "Operational" || stateText == "Complete" || stateText == "Cancelled" || stateText == "Failed") {
+                _cancelRunning = false;
+                _data.printingActive = false;
+                _data.status = stateText;
+            } else {
+                _cancelRunning = true;
+                _data.printingActive = true;
+                _data.status = "Cancelling";
             }
         } else {
-            if (topic.indexOf("temperature/tool0") != -1) {
-                if (doc.containsKey("actual")) _data.nozzleTemp = doc["actual"].as<float>();
-                if (doc.containsKey("target")) _data.nozzleTarget = doc["target"].as<float>();
-            } else if (topic.indexOf("temperature/bed") != -1) {
-                if (doc.containsKey("actual")) _data.bedTemp = doc["actual"].as<float>();
-                if (doc.containsKey("target")) _data.bedTarget = doc["target"].as<float>();
-            }
-        }
-
-        if (doc.containsKey("state")) {
-            JsonObject st = doc["state"];
-            String stateText = st.containsKey("text") ? st["text"].as<String>() : "";
-            
-            bool isPrintingFlag = st.containsKey("flags") && st["flags"].containsKey("printing") ? st["flags"]["printing"].as<bool>() : false;
-            bool isPausedFlag = st.containsKey("flags") && st["flags"].containsKey("paused") ? st["flags"]["paused"].as<bool>() : false;
-            bool isOperational = st.containsKey("flags") && st["flags"].containsKey("operational") ? st["flags"]["operational"].as<bool>() : false;
-
-            if (!_cancelRunning) {
-                if (stateText == "Operational" || stateText == "Complete" || stateText == "Cancelled" || stateText == "Failed" || (isOperational && !isPrintingFlag && !isPausedFlag)) {
-                    _data.printingActive = false;
-                } else if (isPrintingFlag || isPausedFlag || stateText == "Printing" || stateText.indexOf("Printing") != -1 || stateText.indexOf("Working") != -1 || stateText == "Paused" || stateText.indexOf("Paus") != -1) {
-                    _data.printingActive = true;
-                }
+            if (stateText == "Operational" || stateText == "Complete" || stateText == "Cancelled" || stateText == "Failed" || (isOperational && !isPrintingFlag && !isPausedFlag)) {
+                _data.printingActive = false;
+            } else if (isPrintingFlag || isPausedFlag || stateText == "Printing" || stateText.indexOf("Printing") != -1 || stateText.indexOf("Working") != -1 || stateText == "Paused" || stateText.indexOf("Paus") != -1) {
+                _data.printingActive = true;
             }
 
-            if (!_isHoming && !_meshBuildState && !_pidRunning && !_mpcRunning && !_cancelRunning) {
+            if (!_isHoming && !_meshBuildState && !_pidRunning && !_mpcRunning) {
                 if (stateText.length() > 0) {
                     _data.status = stateText;
                 }
             }
         }
     }
-    else if (topic.endsWith("/job") || topic.indexOf("progress") != -1 || topic == "octoprint/job") {
+
+    if (doc.containsKey("temperature")) {
+        if (doc["temperature"].containsKey("tool0")) {
+            if (doc["temperature"]["tool0"].containsKey("actual")) _data.nozzleTemp = doc["temperature"]["tool0"]["actual"].as<float>();
+            if (doc["temperature"]["tool0"].containsKey("target")) _data.nozzleTarget = doc["temperature"]["tool0"]["target"].as<float>();
+        }
+        if (doc["temperature"].containsKey("bed")) {
+            if (doc["temperature"]["bed"].containsKey("actual")) _data.bedTemp = doc["temperature"]["bed"]["actual"].as<float>();
+            if (doc["temperature"]["bed"].containsKey("target")) _data.bedTarget = doc["temperature"]["bed"]["target"].as<float>();
+        }
+    } else {
+        if (topic.indexOf("temperature/tool0") != -1) {
+            if (doc.containsKey("actual")) _data.nozzleTemp = doc["actual"].as<float>();
+            if (doc.containsKey("target")) _data.nozzleTarget = doc["target"].as<float>();
+        } else if (topic.indexOf("temperature/bed") != -1) {
+            if (doc.containsKey("actual")) _data.bedTemp = doc["actual"].as<float>();
+            if (doc.containsKey("target")) _data.bedTarget = doc["target"].as<float>();
+        }
+    }
+
+    if (topic.endsWith("/job") || topic.indexOf("progress") != -1 || topic == "octoprint/job") {
         String fName = "";
         if (doc.containsKey("job") && doc["job"].containsKey("file") && doc["job"]["file"].containsKey("name") && !doc["job"]["file"]["name"].isNull()) {
             fName = doc["job"]["file"]["name"].as<String>();
@@ -309,6 +334,7 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
 
     if (_cancelRunning) {
         _data.status = "Cancelling";
+        _data.printingActive = true;
     } else if (_isHoming) {
         _data.status = "Homing";
     } else if (isMeshBuilding()) {
@@ -331,6 +357,7 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
 void OctoClientMqtt::update() {
     if (_cancelRunning) {
         _data.status = "Cancelling";
+        _data.printingActive = true;
     } else if (_pidRunning) {
         _data.status = "PID Autotune running";
     } else if (_mpcRunning) {
@@ -406,7 +433,6 @@ void OctoClientMqtt::update() {
         _data.status = "Kapcsolódás...";
     }
 
-    // --- BED MESH FÁZIS-3 -> FÁZIS-4 DIAGNOSZTIKUS VEZÉRLŐ ---
     if (isConnected() && isMeshBuilding() && getMeshPhase() == 2) {
         if (_data.bedTemp >= 59.0f || (_data.bedTarget > 0 && _data.bedTemp >= _data.bedTarget - 1.0f)) {
             setMeshPhase(3);
@@ -493,10 +519,6 @@ void OctoClientMqtt::sendGcodeCommand(const String& gcode) {
     }
 }
 
-// ---------------------------------------------------------
-// HTTP REST API VEZÉRLÉS (Pause, Resume, Cancel)
-// ---------------------------------------------------------
-
 void OctoClientMqtt::sendApiJobCommand(const String& jsonPayload) {
     if (WiFi.status() != WL_CONNECTED || _octoIp.length() == 0) {
         Serial.println("[REST API ERROR] Nincs WiFi kapcsolat vagy hianyzik az OctoPrint IP!");
@@ -554,13 +576,11 @@ void OctoClientMqtt::resumePrint() {
 
 void OctoClientMqtt::cancelPrint() {
     Serial.println("[REST API EXEC] Cancel Print");
-    _data.status = "Nyomtatás leállítása...";
+    _cancelRunning = true;
+    _data.status = "Cancelling";
+    _data.printingActive = true;
     sendApiJobCommand("{\"command\":\"cancel\"}");
 }
-
-// ---------------------------------------------------------
-// MQTT / EGYÉB FUNKCIÓK INNENTŐL
-// ---------------------------------------------------------
 
 void OctoClientMqtt::extrudeFilament(float lengthMm, float speedMmMin) {
     sendGcodeCommand("G91");
