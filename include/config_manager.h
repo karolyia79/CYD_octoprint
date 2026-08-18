@@ -17,6 +17,7 @@ struct ThemeColors {
 struct PrinterConfig {
     bool octo_enabled = false;
     String octo_ip = "";
+    String octo_key = ""; // ÚJ: OctoPrint API kulcs
     bool klipper_enabled = false;
     String klipper_ip = "";
     int klipper_port = 7125;
@@ -32,6 +33,11 @@ struct PrinterConfig {
     String gateway = "";
     String subnet = "";
     String dns = "";
+
+    bool led_enabled = true;
+    bool screen_sleep = false;
+    int screen_timeout = 10;
+    int screen_brightness = 100;
 };
 
 class ConfigManager {

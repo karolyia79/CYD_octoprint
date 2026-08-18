@@ -1,0 +1,382 @@
+# Magyar nyelvi fajl - OctoklipScreen
+wifi_connecting=Kapcsolodas a WiFi-hez...
+wifi_authenticating=Hitelesites a routerrel...
+wifi_dhcp=IP cim kerese (DHCP)...
+wifi_waiting=Varakozas a halozatra...
+wifi_connected=Csatlakozva!
+wifi_err_no_ssid=Nem talalhato az SSID!
+wifi_err_bad_pass=Hibas jelszo vagy kulcs!
+wifi_err_lost=Megszakadt a kapcsolat!
+wifi_err_timeout=Idotullepes (20s timeout)
+wifi_no_wifi=Nincs WiFi
+wifi_conn_error=Kapcsolodasi hiba
+
+klipper_menu_title=-- KLIPPER MENU --
+klipper_btn_macros=Gyors Makrok / Parancsok
+klipper_btn_tune=Tune / Z-Offset Allitas
+klipper_default_name=Klipper Nyomtato
+klipper_tune_title_screen=KLIPPER TUNE
+klipper_label_speed=Speed
+klipper_label_nozzle=Nozzle
+klipper_label_bed=Bed
+klipper_label_zoffset=Z-Offset Adj.
+
+octo_menu_title=-- OCTOPRINT MENU --
+octo_menu_mqtt_title=-- OCTOPRINT MENU (MQTT) --
+octo_menu_prepare_title=-- ELOKESZITES --
+octo_menu_calib_title=-- KALIBRACIO --
+octo_menu_control_title=-- IRANYITAS --
+octo_menu_filament_title=-- FILAMENT --
+octo_menu_tune_title_http=OCTOPRINT TUNE
+octo_menu_tune_title=OCTOPRINT TUNE (MQTT)
+octo_menu_zoffset_title=Z-OFFSET KALIBRACIO
+octo_menu_mesh_title=BED MESH KEZELES
+octo_title_bed_mesh=BED MESH
+
+octo_btn_prepare=Elokeszites
+octo_btn_control=Iranyitas
+octo_btn_calibration=Kalibracio
+octo_btn_filament_btn=Filament
+octo_btn_zoffset=Z-Offset
+octo_btn_bedmesh=Bed Mesh
+octo_btn_leveling=Leveling
+octo_btn_other=Egyeb
+octo_coming_soon=Hamarosan...
+
+octo_btn_autohome=Auto Home (G28)
+octo_btn_homing=Home folyamatban...
+octo_btn_steppers_off=Steppers Off (M84)
+octo_btn_cooldown=Cooldown (Hutes)
+octo_btn_zhome=Z-Home (G28 Z)
+octo_btn_save=Mentes (M500)
+octo_btn_build_3x3=Build 3x3
+octo_btn_build_5x5=Build 5x5
+octo_btn_measuring=Meres...
+octo_btn_show_mesh=Show Mesh (Kirajzolas)
+octo_label_zoffset_adj=Z-Offset Adj.
+
+# Z-Offset almenu szovegek
+zoffset_positioning=Pozicionalas (G28 + Z0)...
+zoffset_start_calib=Kalib. inditasa (G28 + Z=0)
+zoffset_g28_g1_progress=G28 es G1 Z0 F300 folyamatban...
+zoffset_wait_ok=Varj az 'OK' megerkezeseig!
+zoffset_start_req=Inditas szukseges!
+zoffset_press_btn_above=A beallitashoz nyomj a fenti gombra!
+zoffset_mod_label=Z-Offset Modositas
+zoffset_save_rehome=Mentes (M500) & Ujra-home
+zoffset_positioning_short=Pozicionalas...
+zoffset_saving=Mentes...
+
+# Tune Menu szovegek
+tune_header_main=Finomhangolas
+tune_header_temp=Homersekletek
+tune_header_speed=Sebesseg (Feedrate)
+tune_header_zoffset=Z-Offset (Babystepping)
+tune_header_camera=Kamerakep
+tune_btn_temp=Homerseklet
+tune_btn_speed=Sebesseg
+tune_btn_zoffset=Z-Offset
+tune_btn_camera=Kamerakep
+tune_btn_default_speed=Alapertelmezett (100%)
+tune_head_fmt=Fej: %.0f / %.0f C
+tune_bed_fmt=Agy: %.0f / %.0f C
+tune_curr_speed=Jelenlegi sebesseg: 
+tune_cam_downloading=Kamera kep letoltese...
+tune_cam_no_ip=Nincs megadva IP cim!
+tune_cam_empty_data=Ures kep adat erkezett!
+tune_cam_sd_error=SD kartya irasi hiba!
+tune_cam_error_http=Kamera hiba! (HTTP 
+
+# Iranyitas (Control) menu szovegek
+control_btn_move=Mozgas
+control_btn_temp=Homerseklet
+control_btn_bltouch=BL/CR Touch
+control_btn_fan=Hutes
+control_bltouch_title=BL/CR Touch
+control_btn_pin_out=Pin ki
+control_btn_pin_in=Pin be
+control_btn_selftest=Onteszt
+control_btn_reset=Reset
+control_fan_title=Hutes
+control_btn_fan_off=Ventilator KI (0%)
+
+octo_msg_downloading_mesh=Adatok letoltese...
+octo_label_speed=Speed
+
+popup_unsupported_title=NEM TAMOGATOTT!
+popup_unsupported_line1=A gep nem ismeri az 5x5-ot.
+popup_unsupported_line2=3x3-as meres indul...
+popup_nomesh_title=NINCS MESH!
+popup_nomesh_line1=Elobb letre kell hozni
+popup_nomesh_line2=egy bed mesht az EEPROM-ban!
+popup_meshsaved_title=MESH SAVED!
+popup_meshsaved_line1=EEPROM & Cooldown OK
+
+octo_menu_filament_temp=Filament / Temp Beallitasok
+octo_menu_speed_flow=Speed / Flow Korrekcio
+octo_btn_filament=Filament / Temp Beallitasok
+octo_btn_speed=Speed / Flow Modifier
+octo_default_name=OctoPrint Nyomtato
+octo_status_working=Mukodik
+octo_status_unknown=Ismeretlen
+
+btn_back=< VISSZA
+btn_ok=OK
+
+# MainScreen szovegek
+main_screen_nozzle=NOZZLE
+main_screen_bed=BED
+main_screen_status=Status: 
+main_screen_remaining=Hatravan:
+main_screen_settings=[ BEALLITASOK ]
+main_screen_pause=PAUSE
+main_screen_tune=TUNE
+main_screen_cancel=CANCEL
+main_screen_no_protocol=Nincs protokoll engedelyezve!
+main_screen_webui_hint=Keresd a WebUI-t a beallitashoz!
+main_screen_api=API
+main_screen_api_error_title=API HIBA!
+main_screen_api_error_line1=A funkciohoz szukseges az API
+main_screen_api_error_line2=eleres konfiguralasa a WebUI-ban.
+main_screen_pause_progress=Szunet...
+main_screen_resume_progress=Folytatas...
+main_screen_cancel_progress=Leallitas...
+
+# Nyomtatasi allapotok (firmware / OctoPrint / Klipper altal visszaadott ertekek)
+Paused=Szuneteltve
+Pausing=Szuneteltetes...
+Cancelling=Nyomtatas leallitasa...
+Folytatas...=Folytatas...
+Szuneteltetes...=Szuneteltetes...
+Szuneteltve=Szuneteltve
+Nyomtatas leallitasa...=Nyomtatas leallitasa...
+header_mode_mqtt=MQTT
+header_mode_timed=TIMED
+
+# MenuScreen szovegek
+menu_title=BEALLITASOK
+menu_btn_wifi=WiFi
+menu_btn_language=Nyelv
+menu_btn_skin=Skin
+menu_btn_system=Rendszer
+menu_status_octo=Octo:  
+menu_status_klipper=Klipper:
+menu_status_print=PRINT
+menu_status_standby=STANDBY
+menu_status_err=ERR
+menu_status_off=OFF
+system_btn_display=Kijelzo
+
+wifi_menu_title=WIFI
+wifi_menu_ssid=SSID: 
+wifi_menu_ip=IP:
+wifi_menu_gateway=Gateway:
+wifi_menu_status=Status: 
+wifi_connected_text=Kapcsolodva
+wifi_none_text=Nincs
+
+server_menu_title=SZERVEREK
+server_octoprint=OctoPrint
+server_klipper=Klipper
+
+skin_menu_title=SKIN
+skin_dark=Dark
+skin_light=Light
+skin_colorful=Colorfull
+
+system_menu_title=RENDSZER
+system_restart=Ujrainditas
+system_del_config=Config Torlese
+system_format_sd=SD Formazas
+system_btn_info=Info
+system_btn_led=LED: 
+
+# Display & Kijelzo Beallitasok
+display_menu_title=KIJELZO BEALLITASOK
+display_screen_sleep=Kepernyo alvas: 
+display_sleep_timeout=Alvasi ido: 
+display_brightness=Fenyero: 
+
+# Rendszer Info almenu szovegek
+info_menu_title=RENDSZER INFO
+info_free_ram=Szabad RAM: 
+info_fw_version=FW Verzio: 
+info_octo_version=OctoPrint: 
+info_sd_files=SD Fajlok: 
+
+# SplashScreen szovegek
+splash_init=OctoScreen Inditasa...
+splash_ap_title=--- AP MOD (NINCS WIFI) ---
+splash_error=Hiba: 
+splash_ssid=1. SSID: 
+splash_pass=2. Jelszo: 
+splash_webui_ip=3. WebUI IP:  
+splash_open_browser=Nyisd meg bongeszoben a beallitashoz!
+splash_client_connected=Kliens csatlakozva
+splash_waiting_client=Varakozas kliensre...
+splash_connected_title=--- HALOZATRA KAPCSOLODVA ---
+splash_device_ip=Eszkoz IP:
+splash_octoprint=OctoPrint:
+splash_klipper=Klipper:
+splash_active=Aktiv
+splash_disabled=Kikapcsolva
+splash_webui_available=WebUI elerheto ezen az IP-n is.
+splash_err_plugin_title=HIBA: HIANYZO PLUGIN!
+splash_err_plugin_req=OctoKlipscreenBridge szukseges!
+splash_err_install_from=Telepitsd innen:
+splash_err_plugin_url1=github.com/karolyia79/
+splash_err_plugin_url2=OctoklipscreenBridge
+splash_err_mqtt_title=HIBA: MQTT BROKER NEM ELERHETO!
+splash_err_mqtt_no_resp=A Mosquitto szerver nem valaszol.
+splash_err_todo=Teendo:
+splash_err_mqtt_todo1=Inditsd el a Mosquitto brokert
+splash_err_mqtt_todo2=vagy ellenorizd az IP-cimet!
+splash_touch_to_continue=Erints meg a kepernyot a folytatashoz
+
+# Boot / Rendszer uzenetek (Boot log & Progress bar)
+boot_octo_check=OctoPrint API ellenorzese...
+boot_mqtt_check=MQTT kapcsolat ellenorzese...
+boot_bridge_check=Bridge plugin ellenorzese...
+boot_sys_ready=Rendszer kesz.
+
+# Logger es Config uzenetek
+logger_file_created=Logfajl letrehozva.
+config_sd_failed=SD.begin hiba! Az SD kartya nem erheto el.
+sys_init=Rendszer inditasa...
+
+# AP WebUI szovegek
+ap_title=OctoScreen Konfiguracio
+ap_lang_title=Nyelv / Language
+ap_wifi_settings=Wi-Fi Beallitasok
+ap_scan_networks=Halozatok Keresese
+ap_selected_ssid=Kivalasztott SSID:
+ap_manual_ssid=Vagy SSID kezzel:
+ap_wifi_pass=Wi-Fi Jelszo:
+ap_show_pass=Jelszo mutatasa
+ap_use_static=Statikus IP hasznalata
+ap_ip_address=IP Cim:
+ap_gateway=Atjaro (Gateway):
+ap_subnet=Alhalozati Maszk:
+ap_dns=DNS Szerver:
+ap_octo_enabled=OctoPrint Kapcsolat Engedelyezese
+ap_octo_ip=OctoPrint IP / Host:
+ap_octo_key=API Kulcs:
+ap_klipper_enabled=Klipper (Moonraker) Engedelyezese
+ap_klipper_ip=Klipper IP / Host:
+ap_klipper_port=Port (Moonraker):
+ap_klipper_key=API Kulcs (Opcionalis):
+ap_save_btn=Mentes es Ujrainditas
+ap_maintenance=Karbantartas es Rendszer
+ap_restart_desc=Az eszkoz azonnali ujrainditasa.
+ap_restart_btn=Eszkoz Ujrainditasa
+ap_format_desc=Az SD kartya teljes tartalmanak torlese es alaphelyzetbe allitasa.
+ap_format_btn=SD Kartya Torlese / Formazasa
+
+# AP WebUI dinamikus kulcsok
+ap_err_lang_change=Hiba a nyelvvaltasakor!
+ap_scan_in_progress=Kereses folyamatban...
+ap_scan_error=Hiba a keresesben!
+ap_confirm_restart=Biztosan ujra szeretned inditani az eszkozt?
+ap_restarting_msg=Eszkoz ujraindul... Kerlek varj.
+ap_op_error=Hiba tortent a muvelet kozben!
+ap_confirm_format=Biztosan torolni szeretned az SD kartya tartalmat? Minden beallitas es log fajl elveszik!
+ap_format_done_msg=SD kartya torolve.
+ap_restarting=Ujrainditas...
+ap_select_ssid_prompt=-- Valassz vagy keresgelj --
+ap_manual_ssid_placeholder=Kezi SSID megadasa
+ap_save_success_msg=Sikeres mentes! A beallitasok azonnal ervenybe leptek.
+ap_redirect_msg=A fooldal hamarosan automatikusan betoltodik.
+ap_device_restarting=Az eszkoz ujraindul...
+ap_format_success_msg=SD kartya torolve es alaphelyzetbe allitva! Az eszkoz ujraindul...
+
+# Egyeb kalibracios menuk (HTTP & MQTT)
+calib_other_title_http=-- EGYEB KALIBRACIO --
+calib_other_title=-- EGYEB KALIBRACIO (MQTT) --
+calib_btn_estep=E-Step Kalibralas
+calib_btn_pid=PID Kalibralas (Auto)
+calib_btn_mpc=MPC Kalibralas (Auto)
+calib_estep_mat_title=VALASZD KI AZ ANYAGOT
+calib_estep_mat_sub=Futes elinditasa elott:
+calib_mat_pla=PLA (200 C)
+calib_mat_petg=PETG (230 C)
+calib_mat_abs=ABS (240 C)
+calib_heating_title=FUTES FOLYAMATBAN...
+calib_target_temp=Cel homerseklet:  
+calib_current_hotend=Aktualis hotend:
+calib_temp_reached=Homerseklet elerve!
+calib_ready_start=Indithato.
+calib_btn_next_measure=Tovabb a mereshez
+calib_heating_in_progress=Futes folyamatban...
+calib_estep_title=E-STEP KALIBRALAS
+calib_estep_extrude_btn=1. 100mm Extrudalas (G1 E100)
+calib_estep_diff_label=Eteres / Maradek (mm):
+calib_btn_save_eeprom=Mentes EEPROM-ba (M500)
+calib_pid_title=PID KALIBRALAS
+calib_pid_desc1=Automata hotend hangolas.
+calib_pid_desc2=Elinditja az M303 parancsot,
+calib_pid_desc3=majd a futes vegen mentheto.
+calib_pid_start_btn=PID Inditasa (M303)
+calib_pid_running_title=PID FOLYAMATBAN...
+calib_exit_save_disabled=Kilepes es mentes tiltva!
+calib_pid_done=PID Autotune kesz!
+calib_waiting_cycles=Varakozas a ciklusokra...
+calib_mpc_title=MPC KALIBRALAS
+calib_mpc_desc1=Model Predictive Control
+calib_mpc_desc2=Automata hangolas es mentes
+calib_mpc_desc3=az EEPROM-ba.
+calib_mpc_start_btn=MPC Inditasa
+calib_mpc_running_title=MPC FOLYAMATBAN...
+calib_mpc_done=MPC Autotune kesz!
+calib_popup_save_success=SIKERES MENTES
+calib_popup_estep_saved=E-Step elmentve & Hutes OK
+calib_popup_cooldown_started=Cooldown (M104/M140 S0) elinditva!
+calib_popup_pid_saved=PID ertekek elmentve
+calib_popup_mpc_saved=MPC ertekek elmentve
+calib_popup_eeprom_m500=az EEPROM-ba (M500)!
+calib_popup_err_unsupported=HIBA: NEM TAMOGATOTT
+calib_popup_mpc_no_fw1=A nyomtato firmware nem
+calib_popup_mpc_no_fw2=ismeri az MPC kalibraciot!
+
+# Bed Leveling Menu Szovegek (HTTP & MQTT)
+bedlevel_title_http=-- ASZTAL SZINTEZES --
+bedlevel_title_mqtt=-- ASZTAL SZINTEZES (MQTT) --
+bedlevel_btn_wiz=Szintezes (Varazslo / Manu)
+bedlevel_btn_coords=Koordinatak Beallitasa
+bedlevel_wiz_title=LEVELING VARAZSLO
+bedlevel_wiz_process=Process...
+bedlevel_wiz_start=Leveling Inditasa
+bedlevel_wiz_next_fr=Next: Jobb Elso (FR)
+bedlevel_wiz_next_br=Next: Jobb Hatso (BR)
+bedlevel_wiz_next_bl=Next: Bal Hatso (BL)
+bedlevel_wiz_finish=Finish (AutoHome)
+bedlevel_coords_title=KOORDINATAK BEALLITASA
+bedlevel_corner_fl=Front Left (FL)
+bedlevel_corner_fr=Front Right (FR)
+bedlevel_corner_br=Back Right (BR)
+bedlevel_corner_bl=Back Left (BL)
+
+# MQTT Kliens Uzenetek
+mqtt_conn_to_broker=[MQTT] Csatlakozas a brokerhez:
+mqtt_success_active=[MQTT SIKER] Csatlakozva!
+mqtt_event_mode_active=Esemenyvezerelt mod AKTIV.
+mqtt_err_failed_code=[MQTT HIBA] Csatlakozas sikertelen. Statuskod:
+mqtt_reconnected_http_off=[MQTT SIKER] Ujracsatlakoztatva! HTTP API Polling KIKAPCSOLVA.
+http_fallback_mesh_build=[HTTP Fallback] Bed Mesh epites inditasa (HTTP REST API)
+http_fallback_mesh_fetch=[HTTP Fallback] Bed Mesh lekerdezese (HTTP REST API)
+
+# OctoClient Log Uzenetek
+octo_log_g28_done_heating=[OctoClient] G28 letelt -> Futes 60 C-ra...
+octo_log_bed_60_g29_start=[OctoClient] Bed elerte a 60 fokot!
+octo_log_g29_start=G29 inditasa...
+octo_log_g29_done_m500=[OctoClient] G29 letelt -> M500 mentes...
+octo_log_save_done_cooldown=[OctoClient] Mentes kesz -> Cooldown (M140 S0)...
+octo_log_mesh_download_ok=[OCTO_BASE] Mesh sikeresen letoltve via HTTP!
+octo_log_mesh_download_empty=[OCTO_BASE] Mesh adatok uresek letoltes utan!
+
+# Main / Rendszer uzenetek
+sys_loading=Rendszer betoltese...
+sys_sd_error=SD MOUNT HIBA!
+sys_clean_boot=Rendszer inditasa (Clean Boot)...
+sys_net_start=Halozat inditasa...
+sys_ap_stopped=AP mod sikeresen leallitva, a WebUI fut tovabb a helyi IP-n!
+sys_octoconfig_created=[OctoConfig] Alapertelmezett octoconfig.json letrehozva.

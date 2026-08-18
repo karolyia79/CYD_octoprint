@@ -8,6 +8,7 @@
 #include "octo_other_calibration_mqtt.h"
 #include "octo_control_menu_mqtt.h"
 #include "octo_filament_menu_mqtt.h"
+#include "octo_tune_menu.h"
 
 class OctoMenuMqtt {
 public:
@@ -17,8 +18,13 @@ public:
     int handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client);
 
     void openMainMenu() { _subState = SUB_MAIN; _forceRedraw = true; }
-    void openTuneMenu() { _subState = SUB_TUNE; _forceRedraw = true; }
-    void forceRedraw() { _forceRedraw = true; }
+    void openTuneMenu() { _subState = SUB_TUNE; _tuneMenu.resetMenu(); _forceRedraw = true; }
+    void forceRedraw() { 
+        _forceRedraw = true; 
+        _tuneMenu.forceRedraw();
+    }
+
+    bool isCameraActive() { return _subState == SUB_TUNE && _tuneMenu.isCameraActive(); }
 
 private:
     TFT_eSPI* _tft;
@@ -26,6 +32,7 @@ private:
     OctoOtherCalibrationMenuMqtt _otherCalibMenu;
     OctoControlMenuMqtt _controlMenu;
     OctoFilamentMenuMqtt _filamentMenu;
+    OctoTuneMenu _tuneMenu;
 
     enum SubState {
         SUB_MAIN, SUB_PREPARE, SUB_CONTROL, SUB_CALIBRATION,
@@ -50,7 +57,6 @@ private:
     void drawMainMenu();
     void drawPrepareMenu(OctoClientMqtt* client = nullptr);
     void drawCalibrationMenu();
-    void drawTuneMenu(OctoClientMqtt* client);
     void drawZOffsetMenu(OctoClientMqtt* client = nullptr);
     void drawMeshMenu(OctoClientMqtt* client);
     void drawShowMeshMenu(OctoClientMqtt* client);
@@ -59,7 +65,6 @@ private:
     void updateMeshButtons(OctoClientMqtt* client);
     void updateZOffsetPrepButton(OctoClientMqtt* client, bool force = false);
 
-    void drawTuneRow(int y, const String& label, const String& valueStr);
     void drawMeshSavedPopup();
     void drawMeshLoadingScreen();
     void drawNoMeshPopup();

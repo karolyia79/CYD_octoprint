@@ -48,7 +48,9 @@ private:
     KlipperMenu _klipperMenu;
     MenuScreen _menuScreen;
 
-    void drawHeader(const String& name, bool isServerConnected);
+    bool _showApiErrorPopup = false;
+
+    void drawHeader(const String& name, bool isServerConnected, bool isApiConnected = false);
     void drawOctoPage(const OctoPrinterData& info);
     void drawKlipperPage(const KlipperPrinterData& info);
     void drawPrinterData(String status, float nT, float nTar, float bT, float bTar, int progress, String time, String totalTime,
@@ -57,6 +59,7 @@ private:
     void drawMenuButton();
     void drawPrintControls();
     void drawDisabledPage(const String& title);
+    void drawApiErrorPopup();
 };
 
 #endif

@@ -3,7 +3,8 @@
 #include <SD.h>
 #include "lang_manager.h"
 #include "ui_utils.h"
-#include "release.h" // Verzió és kiadási infók bevonása
+#include "release.h"
+#include "rgb_led.h"
 
 MenuScreen::MenuScreen(TFT_eSPI* tft, CST820* touch) 
     : _tft(tft), _touch(touch), _currentSubMenu(0), 
@@ -37,7 +38,8 @@ void MenuScreen::draw(bool octoEnabled, bool octoConn, bool octoPrint, bool klip
                 case 2: drawLanguageMenu(); break; 
                 case 3: drawSkinMenu(); break;
                 case 4: drawSystemMenu(); break;
-                case 5: drawInfoMenu(); break; // Infó almenü
+                case 5: drawDisplayMenu(); break;
+                case 6: drawInfoMenu(); break; 
             }
             _lastSubMenuChecked = _currentSubMenu;
         }
@@ -176,9 +178,13 @@ void MenuScreen::drawSystemMenu() {
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->drawString(LangManager::get("system_menu_title"), 160, 15, 2);
     
-    // Rendszer menü elrendezés
-    drawMenuButton(20, 60, 280, 48, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK);
-    drawMenuButton(20, 120, 280, 48, LangManager::get("system_btn_info"), theme.cardBg, theme.text);
+    extern RgbLed rgbLed;
+    bool ledOn = rgbLed.isEnabled();
+
+    // 2x2-es gombrács
+    drawMenuButton(20, 48, 130, 58, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK);
+    drawMenuButton(170, 48, 130, 58, LangManager::get("system_btn_led") + " " + String(ledOn ? "BE" : "KI"), ledOn ? TFT_GREEN : theme.cardBg, ledOn ? TFT_BLACK : theme.text);
+    drawMenuButton(20, 114, 130, 58, LangManager::get("system_btn_display"), theme.cardBg, theme.text);    drawMenuButton(170, 114, 130, 58, LangManager::get("system_btn_info"), theme.cardBg, theme.text);
 
     drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
 }
@@ -191,22 +197,18 @@ void MenuScreen::drawInfoMenu() {
     _tft->setTextColor(theme.text, theme.bg);
     _tft->setTextDatum(ML_DATUM);
 
-    // 1. Szabad RAM / Teljes RAM (KB-ban)
     uint32_t freeHeap = ESP.getFreeHeap() / 1024;
     uint32_t totalHeap = ESP.getHeapSize() / 1024;
     _tft->drawString(LangManager::get("info_free_ram") + " " + String(freeHeap) + " KB / " + String(totalHeap) + " KB", 20, 48, 2);
 
-    // 2. Szabad Flash tárhely / Teljes Flash tárhely (mindkettő KB-ban)
     uint32_t freeFlash = ESP.getFreeSketchSpace() / 1024;
     uint32_t totalFlash = ESP.getFlashChipSize() / 1024;
     String flashStr = "Flash: " + String(freeFlash) + " KB / " + String(totalFlash) + " KB";
     _tft->drawString(flashStr, 20, 75, 2);
 
-    // 3. FW Verzió + Build név
     String fwStr = LangManager::get("info_fw_version") + " " + String(FW_VERSION) + " " + String(FW_BUILD_NAME);
     _tft->drawString(fwStr, 20, 102, 2);
 
-    // 4. SD kártya fájlok száma
     int fileCount = 0;
     File root = SD.open("/");
     if (root) {
@@ -221,7 +223,6 @@ void MenuScreen::drawInfoMenu() {
     }
     _tft->drawString(LangManager::get("info_sd_files") + " " + String(fileCount) + " db (OK)", 20, 129, 2);
 
-    // 5. Release date alul, középre igazítva
     _tft->setTextDatum(TC_DATUM);
     _tft->setTextColor(theme.subText, theme.bg);
     _tft->drawString(String(RELEASE_DATE), 160, 165, 2);
@@ -230,15 +231,37 @@ void MenuScreen::drawInfoMenu() {
     drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
 }
 
+void MenuScreen::drawDisplayMenu() {
+    ThemeColors theme = getCurrentTheme();
+    _tft->setTextColor(theme.accent, theme.bg);
+    _tft->drawString(LangManager::get("display_menu_title"), 160, 20, 2);
+    
+    // 1. Gomb: Képernyő alvás BE / KI (y: 50..85)
+    String sleepStateStr = _config.screen_sleep ? "BE" : "KI";
+    uint16_t sleepBtnBg = _config.screen_sleep ? theme.accent : theme.cardBg;
+    uint16_t sleepBtnText = _config.screen_sleep ? TFT_BLACK : theme.text;
+    drawMenuButton(20, 50, 280, 35, LangManager::get("display_screen_sleep") + " " + sleepStateStr, sleepBtnBg, sleepBtnText);
+
+    // 2. Gomb: Alvási idő (5s / 10s / 30s) (y: 95..130)
+    String timeoutStr = String(_config.screen_timeout) + " sec";
+    drawMenuButton(20, 95, 280, 35, LangManager::get("display_sleep_timeout") + " " + timeoutStr, theme.cardBg, theme.text);
+
+    // 3. Gomb: Fényerő (25% / 50% / 75% / 100%) (y: 140..175)
+    String brightnessStr = String(_config.screen_brightness) + "%";
+    drawMenuButton(20, 140, 280, 35, LangManager::get("display_brightness") + " " + brightnessStr, theme.cardBg, theme.text);
+
+    // Vissza gomb (y: 195..230)
+    drawMenuButton(20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE);
+}
+
 bool MenuScreen::handleClick(uint16_t x, uint16_t y) {
     ThemeColors theme = getCurrentTheme();
 
-    // Vissza gomb kezelése minden almenüben
     if (_currentSubMenu > 0 && y >= 195 && y <= 230) {
         UIUtils::pressFeedback(_tft, 20, 195, 280, 35, LangManager::get("btn_back"), TFT_MAROON, TFT_WHITE, 2, 6);
         
-        if (_currentSubMenu == 5) {
-            _currentSubMenu = 4; // Infóból visszatérés a Rendszer menübe
+        if (_currentSubMenu == 5 || _currentSubMenu == 6) {
+            _currentSubMenu = 4; // Display-ből vagy Infóból visszatérés a Rendszer menübe
         } else {
             _currentSubMenu = 0; // Egyéb almenüből visszatérés a főmenübe
         }
@@ -338,22 +361,95 @@ bool MenuScreen::handleClick(uint16_t x, uint16_t y) {
         }
     }
     else if (_currentSubMenu == 4) {
-        // Rendszer menü (Submenu 4) kattintáskezelése
-        if (x >= 20 && x <= 300) {
-            // Újraindítás gomb (y: 60..108)
-            if (y >= 60 && y <= 108) {
-                UIUtils::pressFeedback(_tft, 20, 60, 280, 48, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, 2, 6);
+        // Rendszer menü (2x2 rács) kattintáskezelése
+        extern RgbLed rgbLed;
+
+        if (y >= 48 && y <= 106) {
+            if (x >= 20 && x <= 150) { 
+                // Bal felső: Újraindítás
+                UIUtils::pressFeedback(_tft, 20, 48, 130, 58, LangManager::get("system_restart"), TFT_ORANGE, TFT_BLACK, 2, 6);
                 ESP.restart();
-            }
-            // Rendszer infó gomb (y: 120..168)
-            else if (y >= 120 && y <= 168) {
-                UIUtils::pressFeedback(_tft, 20, 120, 280, 48, LangManager::get("system_btn_info"), theme.cardBg, theme.text, 2, 6);
-                _currentSubMenu = 5; // Nyitás az Info almenüre
+            }      
+            else if (x >= 170 && x <= 300) { 
+                // Jobb felső: LED KI/BE váltás + mentés a konfigurációba
+                rgbLed.toggleEnabled();
+                bool ledOn = rgbLed.isEnabled();
+
+                _config.led_enabled = ledOn;
+                ConfigManager::saveConfig(_config);
+
+                UIUtils::pressFeedback(_tft, 170, 48, 130, 58, LangManager::get("system_btn_led") + " " + String(ledOn ? "BE" : "KI"), ledOn ? TFT_GREEN : theme.cardBg, ledOn ? TFT_BLACK : theme.text, 2, 6);
+                
+                // Képernyő frissítése, hogy a gomb színe azonnal átváltson
+                _lastSubMenuChecked = 255; 
+                draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
+            } 
+        }
+        else if (y >= 114 && y <= 172) {
+            if (x >= 20 && x <= 150) { 
+                // Bal alsó: Display (Beállítások almenü)
+                UIUtils::pressFeedback(_tft, 20, 114, 130, 58, LangManager::get("system_btn_display"), theme.cardBg, theme.text, 2, 6);
+                _currentSubMenu = 5; // Display almenü
                 _mainMenuButtonsDrawn = false;
                 _tft->fillScreen(theme.bg);
                 draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
-            }
+            }      
+            else if (x >= 170 && x <= 300) { 
+                // Jobb alsó: Rendszer Infó
+                UIUtils::pressFeedback(_tft, 170, 114, 130, 58, LangManager::get("system_btn_info"), theme.cardBg, theme.text, 2, 6);
+                _currentSubMenu = 6; // Infó almenü (eltolva 6-osra)
+                _mainMenuButtonsDrawn = false;
+                _tft->fillScreen(theme.bg);
+                draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
+            } 
         }
     }
+    else if (_currentSubMenu == 5) {
+        // Display almenü kattintáskezelése vizuális visszajelzéssel és mentéssel
+        bool changed = false;
+
+        // 1. Gomb: Képernyő alvás BE/KI (y: 50..85)
+        if (y >= 50 && y <= 85) {
+            _config.screen_sleep = !_config.screen_sleep;
+            String sleepStateStr = _config.screen_sleep ? "BE" : "KI";
+            uint16_t sleepBtnBg = _config.screen_sleep ? theme.accent : theme.cardBg;
+            uint16_t sleepBtnText = _config.screen_sleep ? TFT_BLACK : theme.text;
+            UIUtils::pressFeedback(_tft, 20, 50, 280, 35, LangManager::get("display_screen_sleep") + " " + sleepStateStr, sleepBtnBg, sleepBtnText, 2, 6);
+            changed = true;
+        }
+        // 2. Gomb: Alvási idő ciklikus váltása: 5 -> 10 -> 30 -> 5 (y: 95..130)
+        else if (y >= 95 && y <= 130) {
+            if (_config.screen_timeout == 5) _config.screen_timeout = 10;
+            else if (_config.screen_timeout == 10) _config.screen_timeout = 30;
+            else _config.screen_timeout = 5;
+            String timeoutStr = String(_config.screen_timeout) + " sec";
+            UIUtils::pressFeedback(_tft, 20, 95, 280, 35, LangManager::get("display_sleep_timeout") + " " + timeoutStr, theme.cardBg, theme.text, 2, 6);
+            changed = true;
+        }
+        // 3. Gomb: Fényerő ciklikus váltása: 25% -> 50% -> 75% -> 100% -> 25% (y: 140..175)
+        else if (y >= 140 && y <= 175) {
+            if (_config.screen_brightness == 25) _config.screen_brightness = 50;
+            else if (_config.screen_brightness == 50) _config.screen_brightness = 75;
+            else if (_config.screen_brightness == 75) _config.screen_brightness = 100;
+            else _config.screen_brightness = 25;
+
+            String brightnessStr = String(_config.screen_brightness) + "%";
+            UIUtils::pressFeedback(_tft, 20, 140, 280, 35, LangManager::get("display_brightness") + " " + brightnessStr, theme.cardBg, theme.text, 2, 6);
+            
+            // Fényerő azonnali átállítása a 27-es pinen (PWM)
+            int duty = map(_config.screen_brightness, 0, 100, 0, 255);
+            ledcAttach(27, 5000, 8);
+            ledcWrite(27, duty);
+
+            changed = true;
+        }
+
+        if (changed) {
+            ConfigManager::saveConfig(_config);
+            _lastSubMenuChecked = 255;
+            draw(_pOctoEnabled, _pOctoConn, _pOctoPrint, _pKlipperEnabled, _pKlipperConn, _pKlipperPrint);
+        }
+    }
+
     return false;
 }

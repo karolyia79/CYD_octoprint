@@ -16,6 +16,7 @@ void MainScreen::init() {
     _isTouched = false;
     _isPrinting = false;
     _lastMainPage = 0;
+    _showApiErrorPopup = false;
     
     _octoLastNozzle = -999; _octoLastBed = -999; _octoLastProgress = -1; _octoLastStatus = "";
     _klipperLastNozzle = -999; _klipperLastBed = -999; _klipperLastProgress = -1; _klipperLastStatus = "";
@@ -27,13 +28,22 @@ void MainScreen::init() {
 void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData& klipperData) {
     ThemeColors theme = getCurrentTheme();
 
+    bool octoPrinting = octoData.printingActive;
+                        
+    String octoHeaderName = octoData.name;
+    if (octoPrinting && octoData.printFileName.length() > 0) {
+        octoHeaderName = octoData.printFileName;
+    }
+
     if (_menuState == 1) {
         if (_forceRedraw) {
             _tft->fillScreen(theme.bg);
             _octoMenuMqtt.forceRedraw();
         }
         
-        drawHeader(octoData.name, octoData.connected);
+        if (!_octoMenuMqtt.isCameraActive()) {
+            drawHeader(octoHeaderName, octoData.connected, octoData.apiConnected);
+        }
 
         _tft->setTextColor(theme.text, theme.bg);
         _octoMenuMqtt.draw(_octoMqtt);
@@ -49,7 +59,6 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
             _tft->fillScreen(theme.bg);
             _forceRedraw = false;
         }
-        bool octoPrinting = (octoData.progress > 0 && octoData.progress < 100);
         bool klipperPrinting = (klipperData.progress > 0 && klipperData.progress < 100);
         
         _tft->setTextColor(theme.text, theme.bg);
@@ -67,71 +76,123 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
 
     if (_octoEnabled && _klipperEnabled) {
         if (_currentPage == 0) {
-            drawHeader(octoData.name, octoData.connected);
+            drawHeader(octoHeaderName, octoData.connected, octoData.apiConnected);
             drawOctoPage(octoData);
         } else if (_currentPage == 1) {
-            drawHeader(klipperData.name, klipperData.connected);
+            drawHeader(klipperData.name, klipperData.connected, false);
             drawKlipperPage(klipperData);
         }
     } else if (_octoEnabled) {
         if (_currentPage == 0) {
-            drawHeader(octoData.name, octoData.connected);
+            drawHeader(octoHeaderName, octoData.connected, octoData.apiConnected);
             drawOctoPage(octoData);
         }
     } else if (_klipperEnabled) {
         if (_currentPage == 0) {
-            drawHeader(klipperData.name, klipperData.connected);
+            drawHeader(klipperData.name, klipperData.connected, false);
             drawKlipperPage(klipperData);
         }
     } else {
         drawDisabledPage(LangManager::get("main_screen_no_protocol"));
     }
 
+    if (_showApiErrorPopup) {
+        drawApiErrorPopup();
+    }
+
     _forceRedraw = false;
 }
 
-void MainScreen::drawHeader(const String& name, bool isServerConnected) {
-    static String oldName = "";
+void MainScreen::drawHeader(const String& name, bool isServerConnected, bool isApiConnected) {
     static bool oldConn = !isServerConnected;
+    static bool oldApiConn = !isApiConnected;
     static uint16_t oldWifiColor = 0xFFFF;
+    static String lastRenderedName = "";
+    static unsigned long lastScrollTime = 0;
+
     uint16_t currentWifiColor = ConnectionManager::getStatusColor();
     ThemeColors theme = getCurrentTheme();
     
     bool isLightSkin = (theme.bg == TFT_WHITE || theme.bg > 0xEF5D);
-    String displayName = LangManager::get(name);
-    
-    if (oldName != displayName || oldConn != isServerConnected || oldWifiColor != currentWifiColor || _forceRedraw) {
+    String baseName = (name.length() > 0) ? name : LangManager::get("OctoPrint");
+
+    String displayName = baseName;
+    if (baseName.length() > 18) {
+        unsigned long currentMillis = millis();
+        int scrollIndex = (currentMillis / 350) % (baseName.length() + 3);
+        String padded = baseName + "   " + baseName;
+        displayName = padded.substring(scrollIndex, scrollIndex + 18);
+    } else {
+        displayName = baseName.substring(0, 18);
+    }
+
+    bool scrollChanged = false;
+    if (baseName.length() > 18) {
+        if (millis() - lastScrollTime >= 350) {
+            lastScrollTime = millis();
+            scrollChanged = true;
+        }
+    }
+
+    if (lastRenderedName != displayName || oldConn != isServerConnected || oldApiConn != isApiConnected || oldWifiColor != currentWifiColor || _forceRedraw || scrollChanged) {
         _tft->fillRect(0, 0, 320, 35, theme.cardBg);
         _tft->setTextColor(theme.text, theme.cardBg);
         _tft->setTextDatum(ML_DATUM);
-        _tft->drawString(displayName.substring(0, 18), 10, 17, 2);
+        _tft->drawString(displayName, 10, 17, 2);
 
         _tft->setTextDatum(MR_DATUM);
-        
-        uint16_t modeTextColor = isLightSkin ? TFT_BLUE : TFT_GREEN;
-        _tft->setTextColor(modeTextColor, theme.cardBg);
-        _tft->drawString(LangManager::get("header_mode_mqtt"), 240, 17, 1);
+    
+        // --- API SZÍNES SZÖVEG ---
+        uint16_t activeStatusColor = isLightSkin ? TFT_BLUE : TFT_GREEN;
+        uint16_t apiColor = isApiConnected ? activeStatusColor : TFT_RED;
+        _tft->setTextColor(apiColor, theme.cardBg);
+        _tft->drawString(LangManager::get("main_screen_api"), 245, 17, 1);
 
-        ConnectionManager::drawIcon(_tft, 255, 21);
+        // --- MQTT SZÖVEG ---
+        uint16_t serverColor = isServerConnected ? activeStatusColor : TFT_RED;
+        _tft->setTextColor(serverColor, theme.cardBg);
+        _tft->drawString(LangManager::get("header_mode_mqtt"), 280, 17, 1);
 
-        uint16_t serverColor = isServerConnected ? TFT_GREEN : TFT_RED;
-        _tft->fillCircle(295, 17, 5, serverColor);
+        // --- WIFI IKON ---
+        ConnectionManager::drawIcon(_tft, 293, 19);
 
         _tft->drawFastHLine(0, 35, 320, theme.subText);
-        
-        oldName = displayName;
+    
+        lastRenderedName = displayName;
         oldConn = isServerConnected;
+        oldApiConn = isApiConnected;
         oldWifiColor = currentWifiColor;
     }
 }
 
 void MainScreen::drawOctoPage(const OctoPrinterData& info) {
-    drawPrinterData(info.status, info.nozzleTemp, info.nozzleTarget, info.bedTemp, info.bedTarget, info.progress, info.remainingTime, info.totalTime,
+    String lowerStatus = info.status;
+    lowerStatus.toLowerCase();
+    bool isCurrentlyPrinting = (lowerStatus.indexOf("printing") != -1 || lowerStatus.indexOf("paused") != -1 || info.printingActive);
+    _isPrinting = isCurrentlyPrinting;
+
+    int currentProgress = isCurrentlyPrinting ? info.progress : 0;
+    String timeStr = isCurrentlyPrinting ? info.remainingTime : "0h 00m";
+    String totalTimeStr = isCurrentlyPrinting ? info.totalTime : "";
+
+    drawPrinterData(info.status, info.nozzleTemp, info.nozzleTarget, info.bedTemp, info.bedTarget, 
+                    currentProgress, timeStr, totalTimeStr,
                     _octoLastNozzle, _octoLastBed, _octoLastProgress, _octoLastStatus);
 }
 
 void MainScreen::drawKlipperPage(const KlipperPrinterData& info) {
-    drawPrinterData(info.status, info.nozzleTemp, info.nozzleTarget, info.bedTemp, info.bedTarget, info.progress, info.remainingTime, "",
+    // A drawHeader-t itt NEM hívjuk meg, mert a draw() már elintézte!
+
+    String lowerStatus = info.status;
+    lowerStatus.toLowerCase();
+    bool isCurrentlyPrinting = (lowerStatus.indexOf("printing") != -1 || lowerStatus.indexOf("paused") != -1);
+    _isPrinting = isCurrentlyPrinting;
+
+    int currentProgress = isCurrentlyPrinting ? info.progress : 0;
+    String timeStr = isCurrentlyPrinting ? info.remainingTime : "0h 00m";
+
+    drawPrinterData(info.status, info.nozzleTemp, info.nozzleTarget, info.bedTemp, info.bedTarget, 
+                    currentProgress, timeStr, "",
                     _klipperLastNozzle, _klipperLastBed, _klipperLastProgress, _klipperLastStatus);
 }
 
@@ -154,12 +215,27 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     static uint16_t lastBedColor = 0;
     static float lastNTarVal = -999;
     static float lastBTarVal = -999;
+    static String lastTimeVal = "";
+    static String lastTotalTimeVal = "";
 
     if (_forceRedraw) {
         _tft->fillRoundRect(10, 45, 145, 55, 5, theme.cardBg); 
         _tft->fillRoundRect(165, 45, 145, 55, 5, theme.cardBg); 
         _tft->fillRoundRect(10, 105, 300, 80, 5, theme.cardBg);
         _tft->drawRect(20, 138, 280, 14, theme.subText);
+    }
+
+    bool isPausedState = (status == "Paused" || status == "Szüneteltetve" || status == "Pausing" || status == "Szüneteltetés..." || status == LangManager::get("main_screen_resume_progress") || status == "Nyomtatás leállítása..." || status == "Cancelling");
+    bool newPrintingState = _octoMqtt ? (_octoMqtt->getData().printingActive || isPausedState) : ((progress > 0 && progress < 100) || status.indexOf("rint") >= 0 || status.indexOf("Work") >= 0 || isPausedState);
+
+    if (newPrintingState != _isPrinting || _forceRedraw) {
+        _isPrinting = newPrintingState;
+        if (_isPrinting) {
+            drawPrintControls();
+        } else {
+            _tft->fillRect(10, 192, 300, 42, theme.bg); 
+            drawMenuButton();
+        }
     }
 
     if (_forceRedraw || nozzleColor != lastNozzleColor || bedColor != lastBedColor) {
@@ -175,11 +251,27 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
         lastBedColor = bedColor;
     }
 
+    static unsigned long lastPulseCheck = 0;
+    bool isPulsing = (status == "Nyomtatás leállítása..." || status == "Cancelling" || 
+                      status == "Szüneteltetés..." || status == "Pausing" || status == LangManager::get("main_screen_resume_progress"));
+    
+    bool pulseTick = false;
+    if (isPulsing && (millis() - lastPulseCheck >= 300)) {
+        lastPulseCheck = millis();
+        pulseTick = true;
+    }
+
     bool dataChanged = (abs(nT - lastN) >= 0.01f || abs(bT - lastB) >= 0.01f || 
                         nTar != lastNTarVal || bTar != lastBTarVal ||
-                        progress != lastP || status != lastS || _forceRedraw);
+                        progress != lastP || status != lastS ||
+                        time != lastTimeVal || totalTime != lastTotalTimeVal ||
+                        _forceRedraw);
 
-    if (!dataChanged) return; 
+    if (_isPrinting && (status != lastS || pulseTick) && !_forceRedraw) {
+        drawPrintControls();
+    }
+
+    if (!dataChanged && !pulseTick) return; 
 
     lastN = nT;
     lastB = bT;
@@ -187,21 +279,36 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     lastBTarVal = bTar;
     lastP = progress;
     lastS = status;
+    lastTimeVal = time;
+    lastTotalTimeVal = totalTime;
 
     String displayStatus = LangManager::get(status);
+    String fullStatusText = LangManager::get("main_screen_status") + " " + displayStatus;
+    if (fullStatusText.length() > 38) {
+        fullStatusText = fullStatusText.substring(0, 35) + "...";
+    }
+
+    _tft->fillRect(15, 63, 135, 22, theme.cardBg);
+    _tft->fillRect(170, 63, 135, 22, theme.cardBg);
+
+    char nozzleBuf[32], bedBuf[32];
+    snprintf(nozzleBuf, sizeof(nozzleBuf), "%.2f/%.0fC", nT, nTar);
+    snprintf(bedBuf, sizeof(bedBuf), "%.2f/%.0fC", bT, bTar);
 
     _tft->setTextDatum(TC_DATUM);
     _tft->setTextColor(theme.text, theme.cardBg);
-    
-    _tft->drawString(String(nT, 2) + "/" + String(nTar, 0) + "C   ", 82, 70, 2);
-    _tft->drawString(String(bT, 2) + "/" + String(bTar, 0) + "C   ", 237, 70, 2);
+    _tft->drawString(nozzleBuf, 82, 70, 2);
+    _tft->drawString(bedBuf, 237, 70, 2);
 
     _tft->setTextDatum(ML_DATUM);
     _tft->setTextColor(theme.subText, theme.cardBg);
-    _tft->fillRect(20, 112, 280, 16, theme.cardBg);
-    _tft->drawString(LangManager::get("main_screen_status") + " " + displayStatus, 20, 120, 2);
+    _tft->fillRect(15, 112, 290, 16, theme.cardBg);
+    _tft->drawString(fullStatusText, 20, 120, 2);
     
     int barWidth = (278 * progress) / 100;
+    if (barWidth > 278) barWidth = 278;
+    if (barWidth < 0) barWidth = 0;
+    
     _tft->fillRect(21, 139, barWidth, 12, theme.accent);
     _tft->fillRect(21 + barWidth, 139, 278 - barWidth, 12, theme.cardBg);
     
@@ -210,28 +317,11 @@ void MainScreen::drawPrinterData(String status, float nT, float nTar, float bT, 
     
     String displayTime = LangManager::get(time);
     String timeText = LangManager::get("main_screen_remaining") + " " + displayTime;
-    if (totalTime.length() > 0) {
+    if (totalTime.length() > 0 && totalTime != "--:--") {
         timeText += " / " + totalTime; 
     }
     
     _tft->drawString(timeText, 20, 168, 2);
-
-    bool newPrintingState = (progress > 0 && progress < 100) || 
-                            (status == "octo_status_working") || 
-                            (status == "menu_status_print") || 
-                            (status.indexOf("rint") >= 0) || 
-                            (status.indexOf("Mukodik") >= 0) || 
-                            (status.indexOf("Work") >= 0);
-
-    if (newPrintingState != _isPrinting || _forceRedraw) {
-        _isPrinting = newPrintingState;
-        if (_isPrinting) {
-            drawPrintControls();
-        } else {
-            _tft->fillRect(10, 192, 300, 42, theme.bg); 
-            drawMenuButton();
-        }
-    }
 }
 
 void MainScreen::drawMenuButton() {
@@ -241,9 +331,51 @@ void MainScreen::drawMenuButton() {
 
 void MainScreen::drawPrintControls() {
     ThemeColors theme = getCurrentTheme();
-    UIUtils::drawButton(_tft, 10, 192, 92, 42, LangManager::get("main_screen_pause"), TFT_ORANGE, TFT_BLACK, false, 2, 5);
+    String status = "";
+    if (_octoMqtt) {
+        status = _octoMqtt->getData().status;
+    }
+
+    bool pulseState = (millis() / 400) % 2 == 0;
+
+    if (status == "Szüneteltetés..." || status == "Pausing") {
+        uint16_t bgCol = pulseState ? TFT_ORANGE : _tft->color565(120, 60, 0);
+        UIUtils::drawButton(_tft, 10, 192, 92, 42, LangManager::get("main_screen_pause_progress"), bgCol, TFT_WHITE, false, 2, 5);
+    } else if (status == LangManager::get("main_screen_resume_progress")) {
+        uint16_t bgCol = pulseState ? TFT_GREEN : _tft->color565(0, 80, 0);
+        UIUtils::drawButton(_tft, 10, 192, 92, 42, LangManager::get("main_screen_resume_progress"), bgCol, TFT_WHITE, false, 2, 5);
+    } else if (status == "Paused" || status == "Szüneteltetve") {
+        UIUtils::drawButton(_tft, 10, 192, 92, 42, LangManager::get("main_screen_resume"), TFT_GREEN, TFT_WHITE, false, 2, 5);
+    } else {
+        UIUtils::drawButton(_tft, 10, 192, 92, 42, LangManager::get("main_screen_pause"), TFT_ORANGE, TFT_BLACK, false, 2, 5);
+    }
+
     UIUtils::drawButton(_tft, 114, 192, 92, 42, LangManager::get("main_screen_tune"), theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel"), TFT_RED, TFT_WHITE, false, 2, 5);
+
+    if (status == "Nyomtatás leállítása..." || status == "Cancelling") {
+        uint16_t bgCol = pulseState ? TFT_RED : _tft->color565(120, 0, 0);
+        UIUtils::drawButton(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel_progress"), bgCol, TFT_WHITE, false, 2, 5);
+    } else {
+        UIUtils::drawButton(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel"), TFT_RED, TFT_WHITE, false, 2, 5);
+    }
+}
+
+void MainScreen::drawApiErrorPopup() {
+    ThemeColors theme = getCurrentTheme();
+    
+    _tft->fillRoundRect(20, 45, 280, 150, 8, theme.cardBg);
+    _tft->drawRoundRect(20, 45, 280, 150, 8, TFT_RED);
+    _tft->drawRoundRect(21, 46, 278, 148, 7, TFT_RED);
+
+    _tft->setTextDatum(TC_DATUM);
+    _tft->setTextColor(TFT_RED, theme.cardBg);
+    _tft->drawString(LangManager::get("main_screen_api_error_title"), 160, 58, 2);
+
+    _tft->setTextColor(theme.text, theme.cardBg);
+    _tft->drawString(LangManager::get("main_screen_api_error_line1"), 160, 88, 2);
+    _tft->drawString(LangManager::get("main_screen_api_error_line2"), 160, 110, 2);
+
+    UIUtils::drawButton(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_RED, TFT_WHITE, false, 2, 5);
 }
 
 void MainScreen::drawDisabledPage(const String& title) {
@@ -269,6 +401,21 @@ int MainScreen::handleTouch() {
     static uint16_t startY = 0;
     static uint16_t currentX = 0;
     static uint16_t currentY = 0;
+
+    if (_showApiErrorPopup) {
+        if (touched && !waitForRelease) {
+            currentX = raw_y;
+            currentY = 240 - raw_x;
+            if (currentX >= 100 && currentX <= 220 && currentY >= 135 && currentY <= 190) {
+                UIUtils::pressFeedback(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_RED, TFT_WHITE, 2, 5);
+                _showApiErrorPopup = false;
+                _forceRedraw = true;
+                waitForRelease = true;
+            }
+        }
+        if (!touched) waitForRelease = false;
+        return 0;
+    }
 
     if (waitForRelease) {
         if (!touched) {
@@ -357,9 +504,21 @@ int MainScreen::handleTouch() {
 
             if (_isPrinting) {
                 if (startX >= 10 && startX <= 102) { 
-                    UIUtils::pressFeedback(_tft, 10, 192, 92, 42, LangManager::get("main_screen_pause"), TFT_ORANGE, TFT_BLACK, 2, 5);
+                    if (isOctoActive) {
+                        if (_octoMqtt && _octoMqtt->getData().apiConnected) {
+                            String currentStatus = _octoMqtt->getData().status;
+                            String btnText = (currentStatus == "Paused" || currentStatus == "Szüneteltetve") ? LangManager::get("main_screen_resume") : LangManager::get("main_screen_pause");
+                            uint16_t btnBg = (currentStatus == "Paused" || currentStatus == "Szüneteltetve") ? TFT_GREEN : TFT_ORANGE;
+                            uint16_t btnFg = (currentStatus == "Paused" || currentStatus == "Szüneteltetve") ? TFT_WHITE : TFT_BLACK;
+                            UIUtils::pressFeedback(_tft, 10, 192, 92, 42, btnText, btnBg, btnFg, 2, 5);
+                            _octoMqtt->pausePrint();
+                        } else {
+                            _showApiErrorPopup = true;
+                            _forceRedraw = true;
+                        }
+                    }
                     waitForRelease = true; 
-                    return isOctoActive ? 2 : 12; // Pause
+                    return isOctoActive ? 2 : 12; 
                 }
                 else if (startX >= 114 && startX <= 206) {
                     UIUtils::pressFeedback(_tft, 114, 192, 92, 42, LangManager::get("main_screen_tune"), theme.cardBg, theme.text, 2, 5);
@@ -376,13 +535,21 @@ int MainScreen::handleTouch() {
                     waitForRelease = true;
                 } 
                 else if (startX >= 218 && startX <= 310) { 
-                    UIUtils::pressFeedback(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel"), TFT_RED, TFT_WHITE, 2, 5);
+                    if (isOctoActive) {
+                        if (_octoMqtt && _octoMqtt->getData().apiConnected) {
+                            UIUtils::pressFeedback(_tft, 218, 192, 92, 42, LangManager::get("main_screen_cancel"), TFT_RED, TFT_WHITE, 2, 5);
+                            _octoMqtt->cancelPrint();
+                        } else {
+                            _showApiErrorPopup = true;
+                            _forceRedraw = true;
+                        }
+                    }
                     waitForRelease = true; 
-                    return isOctoActive ? 4 : 14; // Cancel
+                    return isOctoActive ? 4 : 14; 
                 }
             } else {
                 if (startX >= 10 && startX <= 310) {
-                    UIUtils::pressFeedback(_tft, 10, 192, 300, 42, LangManager::get("main_screen_settings"), theme.cardBg, theme.text, 2, 5);
+                    UIUtils::pressFeedback(_tft, 10, 192, 300, 42, LangManager::get("main_screen_settings"), theme.cardBg, theme.text, false, 2, 5);
                     if (isOctoActive) {
                         _octoMenuMqtt.openMainMenu();
                         _octoMenuMqtt.forceRedraw();

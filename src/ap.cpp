@@ -264,6 +264,7 @@ void APManager::setupRoutes() {
         html += "<label for='octo_enabled' style='margin-bottom:0; color:#38bdf8;'>" + LangManager::get("ap_octo_enabled") + "</label>";
         html += "</div>";
         html += "<label>" + LangManager::get("ap_octo_ip") + "</label><input type='text' name='octo_ip' value='" + cfg.octo_ip + "'>";
+        html += "<label>OctoPrint API Key</label><input type='text' name='octo_key' value='" + cfg.octo_key + "'>";
         html += "</div>";
 
         html += "<div class='card'>";
@@ -370,6 +371,7 @@ void APManager::setupRoutes() {
 
         cfg.octo_enabled = (_server.arg("octo_enabled") == "true");
         cfg.octo_ip = _server.arg("octo_ip");
+        cfg.octo_key = _server.arg("octo_key"); // ÚJ API KULCS
 
         cfg.klipper_enabled = (_server.arg("klipper_enabled") == "true");
         cfg.klipper_ip = _server.arg("klipper_ip");
@@ -439,8 +441,7 @@ void APManager::setupRoutes() {
         PrinterConfig defaultCfg;
         ConfigManager::saveConfig(defaultCfg);
 
-        _server.send(200, "text/html; charset=utf-8", "<html><body style='font-family:sans-serif; background:#0f172a; color:#fff; text-align:center; padding-top:50px;'><h2>SD kártya törölve és alaphelyzetbe állítva! Az eszköz újraindul...</h2></body></html>");
-        delay(1000);
+_server.send(200, "text/html; charset=utf-8", "<html>...<h2>" + LangManager::get("ap_format_success_msg") + "</h2>...</html>");        delay(1000);
         ESP.restart();
     });
 }

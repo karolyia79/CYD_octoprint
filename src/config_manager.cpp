@@ -102,6 +102,12 @@ PrinterConfig ConfigManager::loadConfig(bool forceReload) {
 
     if (doc.containsKey("octo_enabled")) config.octo_enabled = doc["octo_enabled"].as<bool>();
     if (doc.containsKey("octo_ip")) config.octo_ip = doc["octo_ip"].as<String>();
+    if (doc.containsKey("octo_key")) config.octo_key = doc["octo_key"].as<String>(); // ÚJ API KULCS
+
+    if (doc.containsKey("led_enabled")) config.led_enabled = doc["led_enabled"].as<bool>();
+    if (doc.containsKey("screen_sleep")) config.screen_sleep = doc["screen_sleep"].as<bool>();
+    if (doc.containsKey("screen_timeout")) config.screen_timeout = doc["screen_timeout"].as<int>();
+    if (doc.containsKey("screen_brightness")) config.screen_brightness = doc["screen_brightness"].as<int>();
 
     if (doc.containsKey("klipper_enabled")) config.klipper_enabled = doc["klipper_enabled"].as<bool>();
     if (doc.containsKey("klipper_ip")) config.klipper_ip = doc["klipper_ip"].as<String>();
@@ -160,11 +166,17 @@ bool ConfigManager::saveConfig(const PrinterConfig& config) {
 
     doc["octo_enabled"] = config.octo_enabled;
     doc["octo_ip"] = config.octo_ip;
+    doc["octo_key"] = config.octo_key; // ÚJ API KULCS
 
     doc["klipper_enabled"] = config.klipper_enabled;
     doc["klipper_ip"] = config.klipper_ip;
     doc["klipper_port"] = config.klipper_port;
     doc["klipper_key"] = config.klipper_key;
+
+    doc["led_enabled"] = config.led_enabled;
+    doc["screen_sleep"] = config.screen_sleep;
+    doc["screen_timeout"] = config.screen_timeout;
+    doc["screen_brightness"] = config.screen_brightness;
 
     doc["skin"] = config.skin;
     doc["language"] = config.language;

@@ -4,12 +4,14 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <HTTPClient.h>
 #include "mqtt_monitor.h"
 
 #define MAX_MESH_SIZE 10
 
 struct OctoPrinterData {
     String name = "OctoPrint";
+    String printFileName = "";
     String status = "Kapcsolódás...";
     float nozzleTemp = 0;
     float nozzleTarget = 0;
@@ -17,10 +19,12 @@ struct OctoPrinterData {
     float bedTarget = 0;
     int speed = 100;
     bool mqttActive = false;
+    bool apiConnected = false; // API kapcsolat állapota
     int progress = 0;
-    String remainingTime = "-";
-    String totalTime;
+    String remainingTime = "--:--";
+    String totalTime = "--:--";
     bool connected = false;
+    bool printingActive = false;
 
     int meshRows = 3;
     int meshCols = 3;
@@ -33,10 +37,23 @@ public:
     OctoClientMqtt(PubSubClient* mqttClient, MqttMonitor* monitor);
 
     bool begin(const String& brokerIp, int port = 1883);
+    
+    // REST API konfiguráció
+    void setApiConfig(const String& octoIp, const String& apiKey) {
+        _octoIp = octoIp;
+        _apiKey = apiKey;
+    }
+
     void update();
     bool isConnected();
+    void checkApiConnection(); // API diagnosztikai hívás
 
     void sendGcodeCommand(const String& gcode);
+
+    // Nyomtatás vezérlő parancsok (REST API)
+    void pausePrint();
+    void resumePrint();
+    void cancelPrint();
 
     // Parancsok
     void autoHome();
@@ -55,7 +72,7 @@ public:
     void unloadFilament(bool isBowden);
     void extrudeFilament(float lengthMm, float speedMmMin = 300.0f);
 
-    // Z-Offset pozicionálás (G28 -> G1 Z0 F300 -> OK várakozás)
+    // Z-Offset pozicionálás
     void startZOffsetPrep();
     bool isZOffsetPrepRunning() const { return _zOffsetPrepRunning; }
     bool isZOffsetReady() const { return _zOffsetReady; }
@@ -108,6 +125,11 @@ private:
     MqttMonitor* _monitor;
     OctoPrinterData _data;
 
+    String _brokerIp;
+    String _octoIp;
+    String _apiKey;
+    int _port;
+
     bool _mqttActive = false;
     bool _isHoming = false;
     uint32_t _homeTimer = 0;
@@ -120,6 +142,11 @@ private:
     bool _unknownCommandError = false;
     unsigned long _cmdStartTime = 0;
     unsigned long _lastBusyTime = 0;
+    unsigned long _lastApiCheckTime = 0; // Időzítő az API automatikus ellenőrzéséhez
+
+    // Megszakítás / Cancel fáziskövető állapotok
+    bool _cancelRunning = false;
+    int _cancelPhase = 0;
 
     // Belső popup állapotok
     bool _showMeshSavedPopup = false;
@@ -137,12 +164,11 @@ private:
     int _pidPhase = 0;
     float _pidKp = 0, _pidKi = 0, _pidKd = 0;
 
-    String _brokerIp;
-    int _port;
     unsigned long _lastReconnectAttempt = 0;
 
     void parseSerialMessage(const String& msg);
     void parseJsonMessage(const String& topic, const String& payload);
+    void sendApiJobCommand(const String& jsonPayload);
 };
 
 #endif

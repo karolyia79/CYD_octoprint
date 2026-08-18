@@ -28,7 +28,8 @@ private:
     void drawLanguageMenu();
     void drawSkinMenu();
     void drawSystemMenu();
-    void drawInfoMenu(); // ÚJ: Rendszer infó almenü
+    void drawDisplayMenu();
+    void drawInfoMenu(); 
     void drawMenuButton(int x, int y, int w, int h, const String& text, uint16_t bgColor, uint16_t textColor = TFT_WHITE);
     void drawServerStatusBars(bool octoEnabled, bool octoConn, bool octoPrint, bool klipperEnabled, bool klipperConn, bool klipperPrint, bool forceRedraw = false);
 
