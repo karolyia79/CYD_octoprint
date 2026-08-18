@@ -380,3 +380,9 @@ sys_clean_boot=Rendszer inditasa (Clean Boot)...
 sys_net_start=Halozat inditasa...
 sys_ap_stopped=AP mod sikeresen leallitva, a WebUI fut tovabb a helyi IP-n!
 sys_octoconfig_created=[OctoConfig] Alapertelmezett octoconfig.json letrehozva.
+
+# Cancel popup ablak
+main_screen_resume=Folytatas
+figyelmeztetes=FIGYELMEZTETES
+cancel_wait_msg1=Vard meg a leallasi
+cancel_wait_msg2=folyamat veget!

@@ -435,7 +435,6 @@ void MainScreen::drawApiErrorPopup() {
     UIUtils::drawButton(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_RED, TFT_WHITE, false, 2, 5);
 }
 
-// --- ÚJ POPUP A LEÁLLÍTÁSI FOLYAMAT ALATTI MEGNYOMÁSRA ---
 void MainScreen::drawCancellingPopup() {
     ThemeColors theme = getCurrentTheme();
     
@@ -445,11 +444,11 @@ void MainScreen::drawCancellingPopup() {
 
     _tft->setTextDatum(TC_DATUM);
     _tft->setTextColor(TFT_ORANGE, theme.cardBg);
-    _tft->drawString("FIGYELMEZTETES", 160, 58, 2);
+    _tft->drawString(LangManager::get("figyelmeztetes"), 160, 58, 2);
 
     _tft->setTextColor(theme.text, theme.cardBg);
-    _tft->drawString("Vard meg a leallasi", 160, 88, 2);
-    _tft->drawString("folyamat veget!", 160, 110, 2);
+    _tft->drawString(LangManager::get("cancel_wait_msg1"), 160, 88, 2);
+    _tft->drawString(LangManager::get("cancel_wait_msg2"), 160, 110, 2);
 
     UIUtils::drawButton(_tft, 110, 145, 100, 36, LangManager::get("btn_ok"), TFT_ORANGE, TFT_WHITE, false, 2, 5);
 }

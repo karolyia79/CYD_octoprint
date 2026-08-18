@@ -380,3 +380,9 @@ sys_clean_boot=Uruchamianie systemu (Clean Boot)...
 sys_net_start=Uruchamianie sieci...
 sys_ap_stopped=Tryb AP zatrzymany, WebUI dziala na lokalnym IP!
 sys_octoconfig_created=[OctoConfig] Domyslny octoconfig.json utworzony.
+
+# Okno anulowania
+main_screen_resume=Wznów
+figyelmeztetes=OSTRZEŻENIE
+cancel_wait_msg1=Poczekaj na zakończenie
+cancel_wait_msg2=procesu anulowania!

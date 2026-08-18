@@ -380,3 +380,9 @@ sys_clean_boot=Starte System (Clean Boot)...
 sys_net_start=Starte Netzwerk...
 sys_ap_stopped=AP-Modus gestoppt, WebUI laeuft unter lokaler IP!
 sys_octoconfig_created=[OctoConfig] Standard octoconfig.json erstellt.
+
+# Cancel-Popup-Fenster
+main_screen_resume=Fortsetzen
+figyelmeztetes=WARNUNG
+cancel_wait_msg1=Warte, bis der Abbruch
+cancel_wait_msg2=abgeschlossen ist!
