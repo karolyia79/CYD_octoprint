@@ -102,10 +102,17 @@ PrinterConfig ConfigManager::loadConfig(bool forceReload) {
 
     if (doc.containsKey("octo_enabled")) config.octo_enabled = doc["octo_enabled"].as<bool>();
     if (doc.containsKey("octo_ip")) config.octo_ip = doc["octo_ip"].as<String>();
-    if (doc.containsKey("octo_key")) config.octo_key = doc["octo_key"].as<String>(); // ÚJ API KULCS
+    if (doc.containsKey("octo_key")) config.octo_key = doc["octo_key"].as<String>();
 
     if (doc.containsKey("led_enabled")) config.led_enabled = doc["led_enabled"].as<bool>();
-    if (doc.containsKey("screen_sleep")) config.screen_sleep = doc["screen_sleep"].as<bool>();
+    
+    // Képernyő mód betöltése
+    if (doc.containsKey("screen_mode")) {
+        config.screen_mode = doc["screen_mode"].as<String>();
+    } else if (doc.containsKey("screen_sleep")) {
+        config.screen_mode = doc["screen_sleep"].as<bool>() ? "sleep" : "off";
+    }
+
     if (doc.containsKey("screen_timeout")) config.screen_timeout = doc["screen_timeout"].as<int>();
     if (doc.containsKey("screen_brightness")) config.screen_brightness = doc["screen_brightness"].as<int>();
 
@@ -129,6 +136,7 @@ PrinterConfig ConfigManager::loadConfig(bool forceReload) {
     Serial.println("  > WiFi SSID: [" + config.wifi_ssid + "]");
     Serial.println("  > Nyelv: [" + config.language + "]");
     Serial.println("  > OctoPrint: " + String(config.octo_enabled ? "ENGEDELYEZVE" : "KIKAPCSOLVA"));
+    Serial.println("  > Screen mode: [" + config.screen_mode + "]");
     Serial.println("==================================================\n");
 
     g_cachedConfig = config;
@@ -166,7 +174,7 @@ bool ConfigManager::saveConfig(const PrinterConfig& config) {
 
     doc["octo_enabled"] = config.octo_enabled;
     doc["octo_ip"] = config.octo_ip;
-    doc["octo_key"] = config.octo_key; // ÚJ API KULCS
+    doc["octo_key"] = config.octo_key;
 
     doc["klipper_enabled"] = config.klipper_enabled;
     doc["klipper_ip"] = config.klipper_ip;
@@ -174,7 +182,7 @@ bool ConfigManager::saveConfig(const PrinterConfig& config) {
     doc["klipper_key"] = config.klipper_key;
 
     doc["led_enabled"] = config.led_enabled;
-    doc["screen_sleep"] = config.screen_sleep;
+    doc["screen_mode"] = config.screen_mode;
     doc["screen_timeout"] = config.screen_timeout;
     doc["screen_brightness"] = config.screen_brightness;
 

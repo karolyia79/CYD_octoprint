@@ -87,6 +87,33 @@ tune_cam_empty_data=Ures kep adat erkezett!
 tune_cam_sd_error=SD kartya irasi hiba!
 tune_cam_error_http=Kamera hiba! (HTTP 
 
+# Filament Menu szovegek (Filament Kezeles)
+filament_mat_pla=PLA (205C)
+filament_mat_petg=PETG (240C)
+filament_mat_abs=ABS (255C)
+filament_ext_direct=Direct Drive
+filament_ext_bowden=Bowden Cso
+filament_btn_next=Tovabb az akciokhoz >>
+filament_btn_back_select=<< Vissza a valasztashoz
+filament_btn_heat_head=Fej Futese
+filament_btn_cool_head=Fej Hutese (0C)
+filament_btn_load=Betoltes (Load)
+filament_btn_load_disabled=Betoltes (Tiltva)
+filament_btn_unload=Kiadas (Unload)
+filament_btn_unload_disabled=Kiadas (Tiltva)
+filament_btn_extrude=Adagolas (+10mm)
+filament_btn_retract=Visszahuzas (-10mm)
+filament_btn_loading=Betoltes...
+filament_btn_unloading=Kiadas...
+filament_btn_heating=Futes...
+filament_btn_start_heat=Futes inditasa
+filament_popup_wait_title=Varakozas a futesre
+filament_popup_wait_line1=A hotend meg nem erte el
+filament_popup_wait_line2=a celhomersekletet (+-3C)!
+filament_popup_start_title=A futes nincs elinditva
+filament_popup_start_line1=Az akciohoz elobb fel kell
+filament_popup_start_line2=futenie a hotendet!
+
 # Iranyitas (Control) menu szovegek
 control_btn_move=Mozgas
 control_btn_temp=Homerseklet
@@ -99,6 +126,18 @@ control_btn_selftest=Onteszt
 control_btn_reset=Reset
 control_fan_title=Hutes
 control_btn_fan_off=Ventilator KI (0%)
+control_axis_x=X Tengely
+control_axis_y=Y Tengely
+control_axis_z=Z Tengely
+control_axis_e=Extruder (E)
+control_bed_btn=Targyasztal
+control_nozzle_btn=Fuvoka
+control_bed_title=Targyasztal
+control_nozzle_title=Fuvoka
+control_btn_heat_off=Futes KI
+control_btn_heat_220=Futes 220C
+popup_cold_warning_title=FIGYELEM!
+popup_cold_warning_msg=Hotend hideg! (<220C)
 
 octo_msg_downloading_mesh=Adatok letoltese...
 octo_label_speed=Speed
@@ -196,6 +235,10 @@ display_menu_title=KIJELZO BEALLITASOK
 display_screen_sleep=Kepernyo alvas: 
 display_sleep_timeout=Alvasi ido: 
 display_brightness=Fenyero: 
+display_screen_mode=Kepernyo vedelem
+mode_off=KI
+mode_sleep=ALVAS
+mode_saver=KEPERNYOVEDO
 
 # Rendszer Info almenu szovegek
 info_menu_title=RENDSZER INFO

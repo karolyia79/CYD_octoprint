@@ -87,6 +87,33 @@ tune_cam_empty_data=Empty image data received!
 tune_cam_sd_error=SD card write error!
 tune_cam_error_http=Camera error! (HTTP 
 
+# Filament Menu text (Filament Management)
+filament_mat_pla=PLA (205C)
+filament_mat_petg=PETG (240C)
+filament_mat_abs=ABS (255C)
+filament_ext_direct=Direct Drive
+filament_ext_bowden=Bowden Tube
+filament_btn_next=Continue to actions >>
+filament_btn_back_select=<< Back to selection
+filament_btn_heat_head=Heat Head
+filament_btn_cool_head=Cool Head (0C)
+filament_btn_load=Load
+filament_btn_load_disabled=Load (Disabled)
+filament_btn_unload=Unload
+filament_btn_unload_disabled=Unload (Disabled)
+filament_btn_extrude=Extrude (+10mm)
+filament_btn_retract=Retract (-10mm)
+filament_btn_loading=Loading...
+filament_btn_unloading=Unloading...
+filament_btn_heating=Heating...
+filament_btn_start_heat=Start Heating
+filament_popup_wait_title=Waiting for heating
+filament_popup_wait_line1=Hotend has not reached
+filament_popup_wait_line2=target temperature (+-3C)!
+filament_popup_start_title=Heating not started
+filament_popup_start_line1=To perform action, hotend
+filament_popup_start_line2=must be heated first!
+
 # Control menu text
 control_btn_move=Move
 control_btn_temp=Temperature
@@ -99,6 +126,18 @@ control_btn_selftest=Self Test
 control_btn_reset=Reset
 control_fan_title=Cooling
 control_btn_fan_off=Fan OFF (0%)
+control_axis_x=X Axis
+control_axis_y=Y Axis
+control_axis_z=Z Axis
+control_axis_e=Extruder (E)
+control_bed_btn=Heatbed
+control_nozzle_btn=Nozzle
+control_bed_title=Heatbed
+control_nozzle_title=Nozzle
+control_btn_heat_off=Heat OFF
+control_btn_heat_220=Heat 220C
+popup_cold_warning_title=WARNING!
+popup_cold_warning_msg=Hotend cold! (<220C)
 
 octo_msg_downloading_mesh=Downloading data...
 octo_label_speed=Speed
@@ -196,6 +235,10 @@ display_menu_title=DISPLAY SETTINGS
 display_screen_sleep=Screen sleep: 
 display_sleep_timeout=Sleep time: 
 display_brightness=Brightness: 
+display_screen_mode=Screen saving:
+mode_off=OFF
+mode_sleep=SLEEP
+mode_saver=SCREENSAVER
 
 # System Info submenu text
 info_menu_title=SYSTEM INFO

@@ -87,9 +87,9 @@ void OctoFilamentMenuMqtt::drawSelectStep() {
     uint16_t absBg  = (_selectedMaterial == MAT_ABS)  ? theme.accent : theme.cardBg;
     uint16_t absTxt = (_selectedMaterial == MAT_ABS)  ? theme.bg     : theme.text;
 
-    UIUtils::drawButton(_tft, 15, 55, 90, 38, "PLA (205C)", plaBg, plaTxt, false, 1, 4);
-    UIUtils::drawButton(_tft, 115, 55, 90, 38, "PETG (240C)", petgBg, petgTxt, false, 1, 4);
-    UIUtils::drawButton(_tft, 215, 55, 90, 38, "ABS (255C)", absBg, absTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 15, 55, 90, 38, LangManager::get("filament_mat_pla"), plaBg, plaTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 115, 55, 90, 38, LangManager::get("filament_mat_petg"), petgBg, petgTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 215, 55, 90, 38, LangManager::get("filament_mat_abs"), absBg, absTxt, false, 1, 4);
 
     // --- 2. Extruder tipus (Direct Drive / Bowden) ---
     uint16_t directBg  = !_isBowden ? theme.accent : theme.cardBg;
@@ -98,11 +98,11 @@ void OctoFilamentMenuMqtt::drawSelectStep() {
     uint16_t bowdenBg  = _isBowden  ? theme.accent : theme.cardBg;
     uint16_t bowdenTxt = _isBowden  ? theme.bg     : theme.text;
 
-    UIUtils::drawButton(_tft, 15, 105, 140, 38, "Direct Drive", directBg, directTxt, false, 1, 4);
-    UIUtils::drawButton(_tft, 165, 105, 140, 38, "Bowden Cso", bowdenBg, bowdenTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 15, 105, 140, 38, LangManager::get("filament_ext_direct"), directBg, directTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 165, 105, 140, 38, LangManager::get("filament_ext_bowden"), bowdenBg, bowdenTxt, false, 1, 4);
 
     // --- 3. Tovabb es Vissza gombok ---
-    UIUtils::drawButton(_tft, 15, 155, 290, 38, "Tovabb az akciokhoz >>", TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
+    UIUtils::drawButton(_tft, 15, 155, 290, 38, LangManager::get("filament_btn_next"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
     UIUtils::drawButton(_tft, 15, 202, 290, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
 
@@ -129,25 +129,25 @@ void OctoFilamentMenuMqtt::drawActionsStep(OctoClientMqtt* client) {
     uint16_t heatBg  = isHeating ? TFT_RED : TFT_ORANGE;
     uint16_t heatTxt = isHeating ? TFT_WHITE : TFT_BLACK;
 
-    UIUtils::drawButton(_tft, 15, 68, 140, 32, "Fej Futese", heatBg, heatTxt, false, 1, 4);
-    UIUtils::drawButton(_tft, 165, 68, 140, 32, "Fej Hutese (0C)", theme.cardBg, theme.text, false, 1, 4);
+    UIUtils::drawButton(_tft, 15, 68, 140, 32, LangManager::get("filament_btn_heat_head"), heatBg, heatTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 165, 68, 140, 32, LangManager::get("filament_btn_cool_head"), theme.cardBg, theme.text, false, 1, 4);
 
     // Dinamikus gomb színezés (Tiltott vs Aktív állapot)
     uint16_t actionBg  = tempReady ? theme.cardBg : _tft->color565(35, 35, 35);
     uint16_t actionTxt = tempReady ? theme.text   : _tft->color565(110, 110, 110);
 
     // --- 2. Betoltes / Kiadas Akcio gombok ---
-    String loadTxt   = tempReady ? "Betoltes (Load)"   : "Betoltes (Tiltva)";
-    String unloadTxt = tempReady ? "Kiadas (Unload)"   : "Kiadas (Tiltva)";
+    String loadTxt   = tempReady ? LangManager::get("filament_btn_load")   : LangManager::get("filament_btn_load_disabled");
+    String unloadTxt = tempReady ? LangManager::get("filament_btn_unload") : LangManager::get("filament_btn_unload_disabled");
     UIUtils::drawButton(_tft, 15, 108, 140, 38, loadTxt, actionBg, actionTxt, false, 1, 4);
     UIUtils::drawButton(_tft, 165, 108, 140, 38, unloadTxt, actionBg, actionTxt, false, 1, 4);
 
     // --- 3. Kezi adagolas (+10mm / -10mm) ---
-    UIUtils::drawButton(_tft, 15, 154, 140, 32, "Adagolas (+10mm)", actionBg, actionTxt, false, 1, 4);
-    UIUtils::drawButton(_tft, 165, 154, 140, 32, "Visszahuzas (-10mm)", actionBg, actionTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 15, 154, 140, 32, LangManager::get("filament_btn_extrude"), actionBg, actionTxt, false, 1, 4);
+    UIUtils::drawButton(_tft, 165, 154, 140, 32, LangManager::get("filament_btn_retract"), actionBg, actionTxt, false, 1, 4);
 
     // --- 4. Vissza a valasztashoz gomb ---
-    UIUtils::drawButton(_tft, 15, 196, 290, 30, "<< Vissza a valasztashoz", theme.cardBg, theme.text, false, 1, 4);
+    UIUtils::drawButton(_tft, 15, 196, 290, 30, LangManager::get("filament_btn_back_select"), theme.cardBg, theme.text, false, 1, 4);
 }
 
 void OctoFilamentMenuMqtt::drawPopupWait() {
@@ -157,13 +157,13 @@ void OctoFilamentMenuMqtt::drawPopupWait() {
 
     _tft->setTextDatum(MC_DATUM);
     _tft->setTextColor(TFT_ORANGE, _tft->color565(30, 20, 10));
-    _tft->drawString("Varakozas a futesre", 160, 82, 2);
+    _tft->drawString(LangManager::get("filament_popup_wait_title"), 160, 82, 2);
 
     _tft->setTextColor(TFT_WHITE, _tft->color565(30, 20, 10));
-    _tft->drawString("A hotend meg nem erte el", 160, 108, 1);
-    _tft->drawString("a celhomersekletet (+-3C)!", 160, 124, 1);
+    _tft->drawString(LangManager::get("filament_popup_wait_line1"), 160, 108, 1);
+    _tft->drawString(LangManager::get("filament_popup_wait_line2"), 160, 124, 1);
 
-    UIUtils::drawButton(_tft, 105, 152, 110, 36, "OK", TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
+    UIUtils::drawButton(_tft, 105, 152, 110, 36, LangManager::get("btn_ok"), TFT_DARKGREEN, TFT_WHITE, false, 2, 5);
 }
 
 void OctoFilamentMenuMqtt::drawPopupStartHeating() {
@@ -173,14 +173,14 @@ void OctoFilamentMenuMqtt::drawPopupStartHeating() {
 
     _tft->setTextDatum(MC_DATUM);
     _tft->setTextColor(TFT_RED, _tft->color565(40, 10, 10));
-    _tft->drawString("A futes nincs elinditva", 160, 82, 2);
+    _tft->drawString(LangManager::get("filament_popup_start_title"), 160, 82, 2);
 
     _tft->setTextColor(TFT_WHITE, _tft->color565(40, 10, 10));
-    _tft->drawString("Az akciohoz elobb fel kell", 160, 108, 1);
-    _tft->drawString("futenie a hotendet!", 160, 124, 1);
+    _tft->drawString(LangManager::get("filament_popup_start_line1"), 160, 108, 1);
+    _tft->drawString(LangManager::get("filament_popup_start_line2"), 160, 124, 1);
 
-    UIUtils::drawButton(_tft, 35, 152, 100, 36, "OK", _tft->color565(60, 60, 60), TFT_WHITE, false, 2, 5);
-    UIUtils::drawButton(_tft, 145, 152, 140, 36, "Futes inditasa", TFT_ORANGE, TFT_BLACK, false, 1, 4);
+    UIUtils::drawButton(_tft, 35, 152, 100, 36, LangManager::get("btn_ok"), _tft->color565(60, 60, 60), TFT_WHITE, false, 2, 5);
+    UIUtils::drawButton(_tft, 145, 152, 140, 36, LangManager::get("filament_btn_start_heat"), TFT_ORANGE, TFT_BLACK, false, 1, 4);
 }
 
 int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* client) {
@@ -190,7 +190,7 @@ int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cl
     if (_activePopup != POPUP_NONE) {
         if (_activePopup == POPUP_WAIT_HEATING) {
             if (y >= 148 && y <= 192 && x >= 105 && x <= 215) {
-                UIUtils::pressFeedback(_tft, 105, 152, 110, 36, "OK", TFT_DARKGREEN, TFT_WHITE, 2, 5);
+                UIUtils::pressFeedback(_tft, 105, 152, 110, 36, LangManager::get("btn_ok"), TFT_DARKGREEN, TFT_WHITE, 2, 5);
             }
             _activePopup = POPUP_NONE;
             _forceRedraw = true;
@@ -199,14 +199,14 @@ int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cl
         } 
         else if (_activePopup == POPUP_START_HEATING) {
             if (y >= 148 && y <= 192 && x >= 35 && x <= 135) {
-                UIUtils::pressFeedback(_tft, 35, 152, 100, 36, "OK", _tft->color565(60, 60, 60), TFT_WHITE, 2, 5);
+                UIUtils::pressFeedback(_tft, 35, 152, 100, 36, LangManager::get("btn_ok"), _tft->color565(60, 60, 60), TFT_WHITE, 2, 5);
                 _activePopup = POPUP_NONE;
                 _forceRedraw = true;
                 draw(client);
                 return 1;
             }
             if (y >= 148 && y <= 192 && x >= 145 && x <= 285) {
-                UIUtils::pressFeedback(_tft, 145, 152, 140, 36, "Futes...", TFT_ORANGE, TFT_BLACK, 1, 4);
+                UIUtils::pressFeedback(_tft, 145, 152, 140, 36, LangManager::get("filament_btn_heating"), TFT_ORANGE, TFT_BLACK, 1, 4);
                 if (client) client->setNozzleTarget(getTargetTemp());
                 _activePopup = POPUP_NONE;
                 _forceRedraw = true;
@@ -236,7 +236,7 @@ int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cl
         }
 
         if (y >= 155 && y <= 195) {
-            UIUtils::pressFeedback(_tft, 15, 155, 290, 38, "Tovabb az akciokhoz >>", TFT_DARKGREEN, TFT_WHITE, 2, 5);
+            UIUtils::pressFeedback(_tft, 15, 155, 290, 38, LangManager::get("filament_btn_next"), TFT_DARKGREEN, TFT_WHITE, 2, 5);
             _currentStep = STEP_ACTIONS;
             _forceRedraw = true;
             draw(client);
@@ -248,7 +248,7 @@ int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cl
     // --- 2. LÉPÉS ÉRINTÉSKEZELÉSE ---
     else { 
         if (y >= 194) { 
-            UIUtils::pressFeedback(_tft, 15, 196, 290, 30, "<< Vissza a valasztashoz", theme.cardBg, theme.text, 1, 4);
+            UIUtils::pressFeedback(_tft, 15, 196, 290, 30, LangManager::get("filament_btn_back_select"), theme.cardBg, theme.text, 1, 4);
             _currentStep = STEP_SELECT;
             _forceRedraw = true;
             draw(client);
@@ -261,13 +261,13 @@ int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cl
         // Futes / Hutes vezérles (y: 68..102)
         if (y >= 68 && y <= 102) {
             if (x >= 15 && x <= 155) {
-                UIUtils::pressFeedback(_tft, 15, 68, 140, 32, "Fej Futese", TFT_RED, TFT_WHITE, 1, 4);
+                UIUtils::pressFeedback(_tft, 15, 68, 140, 32, LangManager::get("filament_btn_heat_head"), TFT_RED, TFT_WHITE, 1, 4);
                 if (client) client->setNozzleTarget(targetTemp);
                 _forceRedraw = true;
                 draw(client);
                 return 1;
             } else if (x >= 165 && x <= 305) {
-                UIUtils::pressFeedback(_tft, 165, 68, 140, 32, "Fej Hutese (0C)", theme.cardBg, theme.text, 1, 4);
+                UIUtils::pressFeedback(_tft, 165, 68, 140, 32, LangManager::get("filament_btn_cool_head"), theme.cardBg, theme.text, 1, 4);
                 if (client) client->setNozzleTarget(0);
                 _forceRedraw = true;
                 draw(client);
@@ -293,11 +293,11 @@ int OctoFilamentMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cl
             // Betoltes / Kiadas Akciok (y: 108..148)
             if (y >= 108 && y <= 148) {
                 if (x >= 15 && x <= 155) {
-                    UIUtils::pressFeedback(_tft, 15, 108, 140, 38, "Betoltes...", theme.cardBg, theme.text, 1, 4);
+                    UIUtils::pressFeedback(_tft, 15, 108, 140, 38, LangManager::get("filament_btn_loading"), theme.cardBg, theme.text, 1, 4);
                     if (client) client->loadFilament(_isBowden);
                     return 1;
                 } else if (x >= 165 && x <= 305) {
-                    UIUtils::pressFeedback(_tft, 165, 108, 140, 38, "Kiadas...", theme.cardBg, theme.text, 1, 4);
+                    UIUtils::pressFeedback(_tft, 165, 108, 140, 38, LangManager::get("filament_btn_unloading"), theme.cardBg, theme.text, 1, 4);
                     if (client) client->unloadFilament(_isBowden);
                     return 1;
                 }
