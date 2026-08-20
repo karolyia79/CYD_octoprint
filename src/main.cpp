@@ -7,6 +7,7 @@
 #include "octo_client_mqtt.h"
 #include "mqtt_monitor.h"
 #include "rgb_led.h"
+#include "screensaver.h"
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <CST820.h>
@@ -18,6 +19,7 @@ CST820 touch(33, 32, -1, 4);
 SplashScreen splash(&tft);
 APManager apManager(&splash);
 RgbLed rgbLed;
+Screensaver screensaver(&tft);
 
 bool isOctoEnabled = false;
 bool isKlipperEnabled = false;
@@ -36,9 +38,10 @@ const unsigned long KLIPPER_UPDATE_INTERVAL = 5000;
 
 TaskHandle_t NetworkTask = nullptr;
 
-// Kijelző alvás és fényerő kezelő változók
+// Kijelző alvás, screensaver és fényerő kezelő változók
 unsigned long lastActivityTime = 0;
 bool isScreenAsleep = false;
+bool isScreensaverActive = false;
 
 void setBacklightBrightness(int percent) {
     if (percent < 0) percent = 0;
@@ -193,6 +196,8 @@ void setup() {
     } else {
         Serial.println("[NET SIKER] Csatlakozva a Wi-Fi hálózathoz! IP: " + WiFi.localIP().toString());
         apManager.startServer();
+        configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "hu.pool.ntp.org", "pool.ntp.org", "time.google.com");
+        Serial.println("[NTP] Időszerver szinkronizáció elindítva (hu.pool.ntp.org)...");
     }
 
     splash.showMessage(LangManager::get("boot_mqtt_check"), TFT_WHITE);
@@ -263,30 +268,58 @@ void loop() {
     // Képernyő érintés észlelése bárhol a kijelzőn -> Aktivitási idő frissítése / Ébresztés
     if (touched) {
         lastActivityTime = millis();
-        if (isScreenAsleep) {
+
+        if (isScreenAsleep || isScreensaverActive) {
             isScreenAsleep = false;
-            setBacklightBrightness(cfg.screen_brightness);
+            isScreensaverActive = false;
             
+            // Fényerő visszaállítása a beállított szintre
+            setBacklightBrightness(cfg.screen_brightness);
+
             // Megvárjuk, amíg elengeded a kijelzőt, így az ébresztő touch nem nyom meg gombot!
             while (touch.getTouch(&touchX, &touchY, &touchGesture)) {
                 delay(10);
             }
-            delay(100); // Szünet az elengedés után
+            delay(50);
+
+            // Képernyő kényszerített újrarajzolása
+            tft.fillScreen(TFT_BLACK);
+            if (currentState == STATE_MAIN && mainScreen) {
+                mainScreen->init();
+                mainScreen->draw(octoMqtt->getData(), klipperClient->getData());
+            } else if (currentState == STATE_MENU && menuScreen) {
+                menuScreen->draw(isOctoEnabled, octoMqtt->isConnected(), false, 
+                                 isKlipperEnabled, klipperClient->getData().connected, false);
+            }
             return;
         }
     }
 
-    // Képernyő elaltatása a beállított időzítés után
-    if (cfg.screen_sleep && !isScreenAsleep) {
+    // Inaktivitási időzítő ellenőrzése
+    if (cfg.screen_mode != "off" && !isScreenAsleep && !isScreensaverActive) {
         if (millis() - lastActivityTime >= (unsigned long)cfg.screen_timeout * 1000) {
-            isScreenAsleep = true;
-            setBacklightBrightness(0); // Háttérvilágítás lekapcsolása
+            if (cfg.screen_mode == "sleep") {
+                isScreenAsleep = true;
+                setBacklightBrightness(0); // Lekapcsolt háttérvilágítás
+            } 
+            else if (cfg.screen_mode == "saver") {
+                isScreensaverActive = true;
+                setBacklightBrightness(map(cfg.screen_brightness, 0, 100, 0, 255) / 2); // Kímélő 50% fényerő
+                screensaver.init();
+            }
         }
     }
 
     // Ha alvó módban van a képernyő, kihagyjuk a rajzolást és az UI gombok kezelését
     if (isScreenAsleep) {
         delay(20);
+        return;
+    }
+
+    // Ha a screensaver aktív, kizárólag az Xperia óra/haladás rajzolódik
+    if (isScreensaverActive) {
+        screensaver.draw(octoMqtt);
+        delay(30);
         return;
     }
 

@@ -1,4 +1,6 @@
-# OctoScreen 🖨️✨
+# OctoklipScreen 🖨️✨
+
+### Klipper mode still not working, but coming soon...
 
 **OctoScreen** is an advanced, ESP32-based touchscreen control interface designed for 3D printers. It provides native, real-time support for both **OctoPrint** (via HTTP REST API and event-driven MQTT modes) and **Klipper (Moonraker)** systems.
 

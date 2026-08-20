@@ -87,6 +87,33 @@ tune_cam_empty_data=Otrzymano puste dane obrazu!
 tune_cam_sd_error=Blad zapisu karty SD!
 tune_cam_error_http=Blad kamery! (HTTP 
 
+# Teksty menu Filament (Zarzadzanie Filamentem)
+filament_mat_pla=PLA (205C)
+filament_mat_petg=PETG (240C)
+filament_mat_abs=ABS (255C)
+filament_ext_direct=Direct Drive
+filament_ext_bowden=Rurka Bowden
+filament_btn_next=Przejdz do akcji >>
+filament_btn_back_select=<< Powrot do wyboru
+filament_btn_heat_head=Grzanie Glowicy
+filament_btn_cool_head=Chlodzenie Glowicy (0C)
+filament_btn_load=Ladowanie (Load)
+filament_btn_load_disabled=Ladowanie (Zablokowane)
+filament_btn_unload=Wysuwanie (Unload)
+filament_btn_unload_disabled=Wysuwanie (Zablokowane)
+filament_btn_extrude=Podawanie (+10mm)
+filament_btn_retract=Cofanie (-10mm)
+filament_btn_loading=Ladowanie...
+filament_btn_unloading=Wysuwanie...
+filament_btn_heating=Grzanie...
+filament_btn_start_heat=Uruchom grzanie
+filament_popup_wait_title=Czekanie na nagrzanie
+filament_popup_wait_line1=Hotend nie osiagnal jeszcze
+filament_popup_wait_line2=temperatury docelowej (+-3C)!
+filament_popup_start_title=Grzanie nieuruchomione
+filament_popup_start_line1=Aby wykonac akcje, hotend
+filament_popup_start_line2=musi najpierw sie nagrzac!
+
 # Teksty menu sterowania
 control_btn_move=Ruch
 control_btn_temp=Temperatura
@@ -99,6 +126,18 @@ control_btn_selftest=Autotest
 control_btn_reset=Reset
 control_fan_title=Chlodzenie
 control_btn_fan_off=Wentylator WYL (0%)
+control_axis_x=Os X
+control_axis_y=Os Y
+control_axis_z=Os Z
+control_axis_e=Ekstruder (E)
+control_bed_btn=Stol
+control_nozzle_btn=Dysza
+control_bed_title=Stol
+control_nozzle_title=Dysza
+control_btn_heat_off=Grzanie WYL
+control_btn_heat_220=Grzanie 220C
+popup_cold_warning_title=UWAGA!
+popup_cold_warning_msg=Hotend zimny! (<220C)
 
 octo_msg_downloading_mesh=Pobieranie danych...
 octo_label_speed=Speed
@@ -196,6 +235,10 @@ display_menu_title=USTAWIENIA EKRANU
 display_screen_sleep=Wygaszenie ekranu: 
 display_sleep_timeout=Czas wygaszenia: 
 display_brightness=Jasnosc: 
+display_screen_mode=Tryb ekranu:
+mode_off=WYŁ
+mode_sleep=UŚPIENIE
+mode_saver=WYGASZACZ
 
 # Teksty podmenu System Info
 info_menu_title=INFORMACJE O SYSTEMIE

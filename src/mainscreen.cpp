@@ -40,7 +40,9 @@ void MainScreen::draw(const OctoPrinterData& octoData, const KlipperPrinterData&
 
     if (_menuState != 0) {
         bool isCurrentPrinting = (_currentPage == 0) ? octoPrinting : klipperPrinting;
-        if (!isCurrentPrinting) {
+        // Csak akkor zárjuk vissza alaphelyzetbe, ha nyomtatás közben szakadt meg / fejeződött be, 
+        // ÉS éppen a Tune menüben vagyunk (ha a főmenüben vagyunk, azt nem csukjuk be üresjáratban).
+        if (!isCurrentPrinting && _menuState == 2) { // vagy ha az octo esetén is szűrni kell
             _menuState = 0;
             _octoMenuMqtt.openMainMenu();
             _klipperMenu.openMainMenu();

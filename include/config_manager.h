@@ -17,7 +17,7 @@ struct ThemeColors {
 struct PrinterConfig {
     bool octo_enabled = false;
     String octo_ip = "";
-    String octo_key = ""; // ÚJ: OctoPrint API kulcs
+    String octo_key = ""; 
     bool klipper_enabled = false;
     String klipper_ip = "";
     int klipper_port = 7125;
@@ -35,7 +35,7 @@ struct PrinterConfig {
     String dns = "";
 
     bool led_enabled = true;
-    bool screen_sleep = false;
+    String screen_mode = "saver"; // "off", "sleep", "saver"
     int screen_timeout = 10;
     int screen_brightness = 100;
 };
@@ -48,16 +48,15 @@ public:
     static void createDefaultConfig();
 };
 
-// Globális dinamikus téma lekérdező (RAM-ból, azonnali válaszidővel)
 inline ThemeColors getCurrentTheme() {
     PrinterConfig config = ConfigManager::loadConfig();
     
     if (config.skin == "light") {
-        return { TFT_WHITE, 0xEF7D, TFT_BLACK, TFT_DARKGREY, TFT_BLUE }; // Világos skin
+        return { TFT_WHITE, 0xEF7D, TFT_BLACK, TFT_DARKGREY, TFT_BLUE }; 
     } else if (config.skin == "colorfull") {
-        return { 0x0010, 0x001F, TFT_YELLOW, TFT_CYAN, TFT_MAGENTA };     // Színes skin
+        return { 0x0010, 0x001F, TFT_YELLOW, TFT_CYAN, TFT_MAGENTA };     
     } else {
-        return { 0x0000, 0x2104, TFT_WHITE, TFT_DARKGREY, TFT_BLUE };     // Sötét skin (Alapértelmezett)
+        return { 0x0000, 0x2104, TFT_WHITE, TFT_DARKGREY, TFT_BLUE };     
     }
 }
 

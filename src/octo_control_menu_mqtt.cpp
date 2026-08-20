@@ -96,10 +96,10 @@ void OctoControlMenuMqtt::drawMoveAxisSelectMenu() {
     _tft->setTextDatum(TC_DATUM);
     _tft->drawString(LangManager::get("control_btn_move"), 160, 48, 2);
 
-    UIUtils::drawButton(_tft, 20, 75, 130, 55, "X Tengely", theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 170, 75, 130, 55, "Y Tengely", theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 20, 138, 130, 55, "Z Tengely", theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 170, 138, 130, 55, "Extruder (E)", theme.cardBg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 20, 75, 130, 55, LangManager::get("control_axis_x"), theme.cardBg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 170, 75, 130, 55, LangManager::get("control_axis_y"), theme.cardBg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 20, 138, 130, 55, LangManager::get("control_axis_z"), theme.cardBg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 170, 138, 130, 55, LangManager::get("control_axis_e"), theme.cardBg, theme.text, false, 2, 5);
 
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
@@ -112,12 +112,12 @@ void OctoControlMenuMqtt::drawMoveControlMenu(OctoClientMqtt* client) {
 
     String axisName = "";
     switch (_currentAxis) {
-        case AXIS_X: axisName = "X Tengely"; break;
-        case AXIS_Y: axisName = "Y Tengely"; break;
-        case AXIS_Z: axisName = "Z Tengely"; break;
+        case AXIS_X: axisName = LangManager::get("control_axis_x"); break;
+        case AXIS_Y: axisName = LangManager::get("control_axis_y"); break;
+        case AXIS_Z: axisName = LangManager::get("control_axis_z"); break;
         case AXIS_E: 
             float currentTemp = client ? client->getData().nozzleTemp : 0.0f;
-            axisName = "Extruder (E) [" + String((int)currentTemp) + "C]"; 
+            axisName = LangManager::get("control_axis_e") + " [" + String((int)currentTemp) + "C]"; 
             break;
     }
     _tft->drawString(axisName, 160, 48, 2);
@@ -150,8 +150,8 @@ void OctoControlMenuMqtt::drawTempSelectMenu() {
     _tft->setTextDatum(TC_DATUM);
     _tft->drawString(LangManager::get("control_btn_temp"), 160, 48, 2);
 
-    UIUtils::drawButton(_tft, 20, 85, 130, 80, "Targyasztal\n(Bed)", theme.cardBg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 170, 85, 130, 80, "Fuvoka\n(Nozzle)", theme.cardBg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 20, 85, 130, 80, LangManager::get("control_bed_btn"), theme.cardBg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 170, 85, 130, 80, LangManager::get("control_nozzle_btn"), theme.cardBg, theme.text, false, 2, 5);
 
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
@@ -195,7 +195,7 @@ void OctoControlMenuMqtt::drawTempControlMenu(OctoClientMqtt* client) {
     _tft->setTextColor(theme.accent, theme.bg);
     _tft->setTextDatum(TC_DATUM);
 
-    String title = (_currentTempTarget == TEMP_BED) ? "Targyasztal (Bed)" : "Fuvoka (Nozzle)";
+    String title = (_currentTempTarget == TEMP_BED) ? LangManager::get("control_bed_title") : LangManager::get("control_nozzle_title");
     _tft->drawString(title, 160, 48, 2);
 
     // Kijelző doboz megrajzolása
@@ -213,7 +213,7 @@ void OctoControlMenuMqtt::drawTempControlMenu(OctoClientMqtt* client) {
 
     UIUtils::drawButton(_tft, 20, 158, 85, 40, "1 C", bg1, txt1, false, 1, 4);
     UIUtils::drawButton(_tft, 117, 158, 85, 40, "10 C", bg10, txt10, false, 1, 4);
-    UIUtils::drawButton(_tft, 215, 158, 85, 40, "Futes KI", TFT_DARKGREY, TFT_WHITE, false, 1, 4);
+    UIUtils::drawButton(_tft, 215, 158, 85, 40, LangManager::get("control_btn_heat_off"), TFT_DARKGREY, TFT_WHITE, false, 1, 4);
 
     UIUtils::drawButton(_tft, 20, 204, 280, 26, LangManager::get("btn_back"), theme.cardBg, theme.text, false, 1, 4);
 }
@@ -226,11 +226,11 @@ void OctoControlMenuMqtt::drawColdWarningPopup() {
 
     _tft->setTextColor(theme.text, theme.cardBg);
     _tft->setTextDatum(TC_DATUM);
-    _tft->drawString("FIGYELEM!", 160, 75, 2);
-    _tft->drawString("Hotend hideg! (<220C)", 160, 98, 2);
+    _tft->drawString(LangManager::get("popup_cold_warning_title"), 160, 75, 2);
+    _tft->drawString(LangManager::get("popup_cold_warning_msg"), 160, 98, 2);
 
-    UIUtils::drawButton(_tft, 45, 135, 105, 45, "OK", theme.bg, theme.text, false, 2, 5);
-    UIUtils::drawButton(_tft, 170, 135, 105, 45, "Futes 220C", theme.accent, theme.bg, false, 1, 5);
+    UIUtils::drawButton(_tft, 45, 135, 105, 45, LangManager::get("btn_ok"), theme.bg, theme.text, false, 2, 5);
+    UIUtils::drawButton(_tft, 170, 135, 105, 45, LangManager::get("control_btn_heat_220"), theme.accent, theme.bg, false, 1, 5);
 }
 
 void OctoControlMenuMqtt::drawBltouchMenu() {
@@ -334,14 +334,14 @@ int OctoControlMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cli
     // 1. Popup figyelmeztetés kezelése (ha látható)
     if (_showColdWarningPopup) {
         if (y >= 135 && y <= 180 && x >= 45 && x <= 150) {
-            UIUtils::pressFeedback(_tft, 45, 135, 105, 45, "OK", theme.bg, theme.text, 2, 5);
+            UIUtils::pressFeedback(_tft, 45, 135, 105, 45, LangManager::get("btn_ok"), theme.bg, theme.text, 2, 5);
             _showColdWarningPopup = false;
             _forceRedraw = true;
             draw(client);
             return 1;
         }
         if (y >= 135 && y <= 180 && x >= 170 && x <= 275) {
-            UIUtils::pressFeedback(_tft, 170, 135, 105, 45, "Futes 220C", theme.accent, theme.bg, 1, 5);
+            UIUtils::pressFeedback(_tft, 170, 135, 105, 45, LangManager::get("control_btn_heat_220"), theme.accent, theme.bg, 1, 5);
             if (client) {
                 client->sendGcodeCommand("M104 S220");
             }
@@ -412,14 +412,14 @@ int OctoControlMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cli
     else if (_subState == 1) {
         if (y >= 75 && y <= 130) {
             if (x >= 20 && x <= 150) {
-                UIUtils::pressFeedback(_tft, 20, 75, 130, 55, "X Tengely", theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 20, 75, 130, 55, LangManager::get("control_axis_x"), theme.cardBg, theme.text, 2, 5);
                 _currentAxis = AXIS_X;
                 _subState = 10;
                 _forceRedraw = true;
                 draw(client);
                 return 1;
             } else if (x >= 170 && x <= 300) {
-                UIUtils::pressFeedback(_tft, 170, 75, 130, 55, "Y Tengely", theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 170, 75, 130, 55, LangManager::get("control_axis_y"), theme.cardBg, theme.text, 2, 5);
                 _currentAxis = AXIS_Y;
                 _subState = 10;
                 _forceRedraw = true;
@@ -428,14 +428,14 @@ int OctoControlMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cli
             }
         } else if (y >= 138 && y <= 193) {
             if (x >= 20 && x <= 150) {
-                UIUtils::pressFeedback(_tft, 20, 138, 130, 55, "Z Tengely", theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 20, 138, 130, 55, LangManager::get("control_axis_z"), theme.cardBg, theme.text, 2, 5);
                 _currentAxis = AXIS_Z;
                 _subState = 10;
                 _forceRedraw = true;
                 draw(client);
                 return 1;
             } else if (x >= 170 && x <= 300) {
-                UIUtils::pressFeedback(_tft, 170, 138, 130, 55, "Extruder (E)", theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 170, 138, 130, 55, LangManager::get("control_axis_e"), theme.cardBg, theme.text, 2, 5);
                 _currentAxis = AXIS_E;
                 _subState = 10;
                 _forceRedraw = true;
@@ -485,14 +485,14 @@ int OctoControlMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cli
     else if (_subState == 2) {
         if (y >= 85 && y <= 165) {
             if (x >= 20 && x <= 150) {
-                UIUtils::pressFeedback(_tft, 20, 85, 130, 80, "Targyasztal\n(Bed)", theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 20, 85, 130, 80, LangManager::get("control_bed_btn"), theme.cardBg, theme.text, 2, 5);
                 _currentTempTarget = TEMP_BED;
                 _subState = 20;
                 _forceRedraw = true;
                 draw(client);
                 return 1;
             } else if (x >= 170 && x <= 300) {
-                UIUtils::pressFeedback(_tft, 170, 85, 130, 80, "Fuvoka\n(Nozzle)", theme.cardBg, theme.text, 2, 5);
+                UIUtils::pressFeedback(_tft, 170, 85, 130, 80, LangManager::get("control_nozzle_btn"), theme.cardBg, theme.text, 2, 5);
                 _currentTempTarget = TEMP_NOZZLE;
                 _subState = 20;
                 _forceRedraw = true;
@@ -541,7 +541,7 @@ int OctoControlMenuMqtt::handleTouch(uint16_t x, uint16_t y, OctoClientMqtt* cli
             }
             // Fűtés KI (0°C) gomb
             else if (x >= 215 && x <= 300) {
-                UIUtils::pressFeedback(_tft, 215, 158, 85, 40, "Futes KI", TFT_DARKGREY, TFT_WHITE, 1, 4);
+                UIUtils::pressFeedback(_tft, 215, 158, 85, 40, LangManager::get("control_btn_heat_off"), TFT_DARKGREY, TFT_WHITE, 1, 4);
                 sendTempCommand(0, client);
                 drawTempDisplayBox(client); // Csak a kijelző mezőt frissítjük
                 return 1;

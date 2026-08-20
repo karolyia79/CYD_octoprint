@@ -87,6 +87,33 @@ tune_cam_empty_data=Leere Bilddaten empfangen!
 tune_cam_sd_error=SD-Karten Schreibfehler!
 tune_cam_error_http=Kamerafehler! (HTTP 
 
+# Filament Menue Texte (Filament-Verwaltung)
+filament_mat_pla=PLA (205C)
+filament_mat_petg=PETG (240C)
+filament_mat_abs=ABS (255C)
+filament_ext_direct=Direct Drive
+filament_ext_bowden=Bowden-Schlauch
+filament_btn_next=Weiter zu den Aktionen >>
+filament_btn_back_select=<< Zurueck zur Auswahl
+filament_btn_heat_head=Kopf heizen
+filament_btn_cool_head=Kopf abkuehlen (0C)
+filament_btn_load=Laden (Load)
+filament_btn_load_disabled=Laden (Gesperrt)
+filament_btn_unload=Entladen (Unload)
+filament_btn_unload_disabled=Entladen (Gesperrt)
+filament_btn_extrude=Extrudieren (+10mm)
+filament_btn_retract=Einziehen (-10mm)
+filament_btn_loading=Laden...
+filament_btn_unloading=Entladen...
+filament_btn_heating=Heizen...
+filament_btn_start_heat=Heizen starten
+filament_popup_wait_title=Warten auf Aufheizen
+filament_popup_wait_line1=Das Hotend hat die
+filament_popup_wait_line2=Zieltemperatur (+-3C) nicht erreicht!
+filament_popup_start_title=Heizung nicht gestartet
+filament_popup_start_line1=Fuer diese Aktion muss das
+filament_popup_start_line2=Hotend zuerst heizen!
+
 # Steuerung Menue Texte
 control_btn_move=Bewegung
 control_btn_temp=Temperatur
@@ -99,6 +126,18 @@ control_btn_selftest=Selbsttest
 control_btn_reset=Reset
 control_fan_title=Kuehlung
 control_btn_fan_off=Luefter AUS (0%)
+control_axis_x=X-Achse
+control_axis_y=Y-Achse
+control_axis_z=Z-Achse
+control_axis_e=Extruder (E)
+control_bed_btn=Druckbett
+control_nozzle_btn=Duese
+control_bed_title=Druckbett
+control_nozzle_title=Duese
+control_btn_heat_off=Heizung AUS
+control_btn_heat_220=Heizen 220C
+popup_cold_warning_title=ACHTUNG!
+popup_cold_warning_msg=Hotend zu kalt! (<220C)
 
 octo_msg_downloading_mesh=Lade Daten...
 octo_label_speed=Speed
@@ -196,6 +235,10 @@ display_menu_title=DISPLAY EINSTELLUNGEN
 display_screen_sleep=Ruhezustand: 
 display_sleep_timeout=Zeit bis Ruhe: 
 display_brightness=Helligkeit: 
+display_screen_mode=Bildschirmmodus:
+mode_off=AUS
+mode_sleep=RUHEMODUS
+mode_saver=BILDSCHIRMSCHONER
 
 # System Info Untermenue Texte
 info_menu_title=SYSTEM INFO

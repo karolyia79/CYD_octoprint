@@ -307,12 +307,29 @@ void OctoClientMqtt::parseSerialMessage(const String& msg) {
         }
     }
     
+    static bool extMeshReportSeen = false;
     if (isG29Command) {
         if (!isMeshBuilding()) {
             Serial.printf("[%lu ms] [PARSER WARNING] külső G29 visszahang! setMeshBuildState(3), Phase(1)\n", millis());
             setMeshBuildState(3);
             setMeshPhase(1);
+            extMeshReportSeen = false;
             _cmdStartTime = millis();
+        }
+    }
+
+    // Külső G29 lezárásának követése (amikor nem a kijelző saját fűtési varázslója fut)
+    if (isMeshBuilding() && getMeshPhase() == 1) {
+        if (msg.indexOf("X:") != -1 || msg.indexOf("Grid") != -1 || msg.indexOf("Mesh") != -1 || msg.indexOf("Bilinear") != -1 || msg.indexOf("Count") != -1) {
+            extMeshReportSeen = true;
+        }
+        if (msg.indexOf("ok") != -1 && (msg.indexOf("T:") == -1 && msg.indexOf("B:") == -1)) {
+            if (extMeshReportSeen || (millis() - _cmdStartTime > 45000)) {
+                Serial.printf("[%lu ms] [PARSER] Külső Mesh adatok megérkeztek -> Mesh building lezárva.\n", millis());
+                setMeshBuildState(0);
+                setMeshPhase(0);
+                extMeshReportSeen = false;
+            }
         }
     }
 
@@ -467,35 +484,28 @@ void OctoClientMqtt::update() {
                     bool timeout = (millis() - this->_cmdStartTime > 60000);
                     Serial.printf("[%lu ms] [DIAG Phase 3 Check] meshReportSeen=%d, timeout=%d\n", millis(), meshReportSeen, timeout);
                     
+                    // AMINT A MESH JELENTÉS / MÁTRIX MEGÉRKEZIK -> AZONNAL KÉSZNÉK VESSSZÜK A MÉRÉST!
                     if (meshReportSeen || timeout) {
-                        Serial.printf("\n--------------------------------------------------\n");
-                        Serial.printf("[%lu ms] [DIAG Phase 3 -> Phase 4] G29 OK MEEGÉRKEZETT! M500 KÜLDÉSE...\n", millis());
-                        Serial.printf("--------------------------------------------------\n");
+                        Serial.printf("\n==================================================\n");
+                        Serial.printf("[%lu ms] [DIAG MESH LEZÁRÁS] G29 / MESH MÉRÉS SIKERESEN KÉSZ!\n", millis());
+                        Serial.printf("==================================================\n");
                         
-                        this->setMeshPhase(4);
-                        this->sendGcodeCommand("M500");
+                        this->setMeshBuildState(0);
+                        this->setMeshPhase(0);
+                        
+                        this->setShowMeshSavedPopup(true);
+
+                        this->sendGcodeCommand("M140 S0");
+                        this->sendGcodeCommand("M104 S0");
+
+                        this->_data.bedTarget = 0;
+                        this->_data.nozzleTarget = 0;
+
+                        this->_pendingClearWatchers = true;
                         meshReportSeen = false;
                     } else {
                         Serial.printf("[%lu ms] [DIAG Phase 3] Még NEM volt pozíciójelentés, 'ok' figyelmen kívül hagyva.\n", millis());
                     }
-                } 
-                else if (currentPhase == 4) {
-                    Serial.printf("\n==================================================\n");
-                    Serial.printf("[%lu ms] [DIAG Phase 4 LEZÁRÁS] M500 OK MEGERKEZETT! MÉRÉS SIKERESEN KÉSZ!\n", millis());
-                    Serial.printf("==================================================\n");
-                    
-                    this->setMeshBuildState(0);
-                    this->setMeshPhase(0);
-                    
-                    this->setShowMeshSavedPopup(true);
-
-                    this->sendGcodeCommand("M140 S0");
-                    this->sendGcodeCommand("M104 S0");
-
-                    this->_data.bedTarget = 0;
-                    this->_data.nozzleTarget = 0;
-
-                    this->_pendingClearWatchers = true;
                 }
             });
 
